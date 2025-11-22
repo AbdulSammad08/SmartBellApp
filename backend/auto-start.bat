@@ -1,0 +1,6 @@
+@echo off
+echo Killing any existing processes on port 8080...
+for /f "tokens=5" %%a in ('netstat -aon ^| findstr :8080') do taskkill /f /pid %%a >nul 2>&1
+timeout /t 2 /nobreak >nul
+echo Starting server...
+node server.js
