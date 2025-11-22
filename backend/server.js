@@ -104,25 +104,30 @@ const startServer = async () => {
   }
 };
 
-startServer().then(server => {
+// Export app for Vercel
+module.exports = app;
 
-  // Graceful shutdown
-  process.on('SIGTERM', () => {
-    console.log('\n🛑 SIGTERM received, shutting down gracefully');
-    server.close(() => {
-      console.log('✅ Process terminated');
-      process.exit(0);
+// Start server only if not in Vercel environment
+if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+  startServer().then(server => {
+    // Graceful shutdown
+    process.on('SIGTERM', () => {
+      console.log('\n🛑 SIGTERM received, shutting down gracefully');
+      server.close(() => {
+        console.log('✅ Process terminated');
+        process.exit(0);
+      });
     });
-  });
 
-  process.on('SIGINT', () => {
-    console.log('\n🛑 SIGINT received, shutting down gracefully');
-    server.close(() => {
-      console.log('✅ Process terminated');
-      process.exit(0);
+    process.on('SIGINT', () => {
+      console.log('\n🛑 SIGINT received, shutting down gracefully');
+      server.close(() => {
+        console.log('✅ Process terminated');
+        process.exit(0);
+      });
     });
+  }).catch(error => {
+    console.error('❌ Server startup failed:', error);
+    process.exit(1);
   });
-}).catch(error => {
-  console.error('❌ Server startup failed:', error);
-  process.exit(1);
-});
+}
