@@ -3,7 +3,7 @@
   "builds": [
     {
       "src": "server.js",
-      "use": "@vercel/node"
+      "use": "@vercel/node@3"
     }
   ],
   "routes": [
@@ -12,6 +12,11 @@
       "dest": "/server.js"
     }
   ],
+  "functions": {
+    "server.js": {
+      "runtime": "nodejs22.x"
+    }
+  },
   "env": {
     "NODE_ENV": "production"
   }
