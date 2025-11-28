@@ -16,7 +16,7 @@ class SubscriptionReceiptScreen extends StatefulWidget {
 class _SubscriptionReceiptScreenState extends State<SubscriptionReceiptScreen> {
   String _selectedCycle = 'monthly';
   
-  double get monthlyPricePKR => widget.plan.price * 280;
+  double get monthlyPricePKR => widget.plan.price;
   double get yearlyPricePKR => (monthlyPricePKR * 12) - (monthlyPricePKR * 2); // 2 months discount
   double get finalAmount => _selectedCycle == 'monthly' ? monthlyPricePKR : yearlyPricePKR;
 

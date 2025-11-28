@@ -1,4 +1,5 @@
 @echo off
+setlocal enabledelayedexpansion
 echo ========================================
 echo    Smart Doorbell - Auto Startup
 echo ========================================
@@ -10,10 +11,10 @@ for /f "tokens=2 delims=:" %%i in ('ipconfig ^| findstr "IPv4" ^| findstr "192.1
     goto :found
 )
 :found
-echo Current IP: %IP%
+echo Current IP: !IP!
 
 echo [2/3] Updating app configuration...
-powershell -Command "(Get-Content 'lib\config\app_config.dart') -replace 'http://192\.168\.\d+\.\d+:8080', 'http://%IP%:8080' | Set-Content 'lib\config\app_config.dart'"
+powershell -Command "(Get-Content 'lib\config\app_config.dart') -replace 'http://192\.168\.\d+\.\d+:8080', 'http://!IP!:8080' | Set-Content 'lib\config\app_config.dart'"
 
 echo [3/3] Starting backend server...
 cd backend
@@ -22,7 +23,7 @@ cd ..
 
 echo ========================================
 echo ✅ Setup Complete!
-echo 📡 Backend: http://%IP%:8080
+echo 📡 Backend: http://!IP!:8080
 echo 📱 Now run: flutter run
 echo ========================================
 pause

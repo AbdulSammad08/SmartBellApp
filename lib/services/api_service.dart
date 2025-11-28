@@ -722,6 +722,78 @@ class ApiService {
   static Future<void> clearStoredToken() async {
     await _clearStoredToken();
   }
+
+  // Motion Detection API methods
+  static Future<Map<String, dynamic>> getMotionDetections() async {
+    try {
+      final baseUrl = await _getWorkingBaseUrl();
+      final token = await _getStoredToken();
+      
+      final response = await http.get(
+        Uri.parse('$baseUrl/api/motion/detections'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(AppConfig.connectionTimeout);
+      
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        return {
+          'success': false,
+          'message': 'Failed to fetch motion detections',
+        };
+      }
+    } catch (e) {
+      _workingBaseUrl = null;
+      return {
+        'success': false,
+        'message': 'Connection failed: $e',
+      };
+    }
+  }
+
+  static Future<Map<String, dynamic>> addMotionDetection({String? location}) async {
+    try {
+      final baseUrl = await _getWorkingBaseUrl();
+      
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/motion/detect'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'location': location ?? 'Front Door',
+        }),
+      ).timeout(AppConfig.connectionTimeout);
+      
+      return jsonDecode(response.body);
+    } catch (e) {
+      _workingBaseUrl = null;
+      return {
+        'success': false,
+        'message': 'Failed to record motion detection: $e',
+      };
+    }
+  }
+
+  static Future<Map<String, dynamic>> deleteMotionDetection(String motionId) async {
+    try {
+      final baseUrl = await _getWorkingBaseUrl();
+      
+      final response = await http.delete(
+        Uri.parse('$baseUrl/api/motion/detections/$motionId'),
+        headers: {'Content-Type': 'application/json'},
+      ).timeout(AppConfig.connectionTimeout);
+      
+      return jsonDecode(response.body);
+    } catch (e) {
+      _workingBaseUrl = null;
+      return {
+        'success': false,
+        'message': 'Failed to delete motion detection: $e',
+      };
+    }
+  }
 }
 
 class ApiResponse {

@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:webview_flutter/webview_flutter.dart';
 import '../constants/colors.dart';
+import 'live_stream_screen.dart';
 
 class VisitorNotificationScreen extends StatefulWidget {
-  final String streamUrl;
-
-  const VisitorNotificationScreen({super.key, required this.streamUrl});
+  final String? streamUrl;
+  const VisitorNotificationScreen({super.key, this.streamUrl});
 
   @override
   State<VisitorNotificationScreen> createState() =>
@@ -16,11 +15,6 @@ class _VisitorNotificationScreenState extends State<VisitorNotificationScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _fadeAnimation;
-  bool _showControls = false;
-  bool _isTalking = false;
-  late WebViewController _webViewController;
-  bool _isLoading = true;
-  String? _errorMessage;
 
   @override
   void initState() {
@@ -31,66 +25,20 @@ class _VisitorNotificationScreenState extends State<VisitorNotificationScreen>
     );
     _fadeAnimation = Tween(begin: 0.0, end: 1.0).animate(_controller);
     _controller.forward();
-
-    // Initialize WebView controller with enhanced configuration
-    _webViewController =
-        WebViewController()
-          ..setJavaScriptMode(JavaScriptMode.unrestricted)
-          ..setBackgroundColor(Colors.black)
-          ..setNavigationDelegate(
-            NavigationDelegate(
-              onPageStarted: (url) {
-                setState(() {
-                  _isLoading = true;
-                  _errorMessage = null;
-                });
-              },
-              onPageFinished: (url) {
-                setState(() {
-                  _isLoading = false;
-                });
-              },
-              onWebResourceError: (error) {
-                setState(() {
-                  _isLoading = false;
-                  _errorMessage =
-                      'Error loading stream (Code: ${error.errorCode})';
-                });
-                debugPrint(
-                  'WebView error: ${error.errorCode} - ${error.description}',
-                );
-              },
-            ),
-          )
-          ..loadRequest(
-            Uri.parse(widget.streamUrl),
-            headers: {'Connection': 'keep-alive', 'Cache-Control': 'no-cache'},
-          );
   }
 
   @override
   void dispose() {
     _controller.dispose();
-    _webViewController.clearCache();
     super.dispose();
   }
 
-  void _toggleControls() {
-    setState(() => _showControls = !_showControls);
-  }
-
-  void _toggleTalking() {
-    setState(() => _isTalking = !_isTalking);
-  }
-
-  void _retryStream() {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-    _webViewController.loadRequest(
-      Uri.parse(widget.streamUrl),
-      headers: {'Connection': 'keep-alive', 'Cache-Control': 'no-cache'},
+  void _openLiveStream() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => LiveStreamScreen(streamUrl: widget.streamUrl),
+      ),
     );
   }
 
@@ -100,115 +48,20 @@ class _VisitorNotificationScreenState extends State<VisitorNotificationScreen>
       backgroundColor: Colors.black,
       body: FadeTransition(
         opacity: _fadeAnimation,
-        child: Stack(
-          children: [
-            // Live Stream WebView with loading/error states
-            Positioned.fill(
-              child: Stack(
-                children: [
-                  WebViewWidget(controller: _webViewController),
-                  if (_isLoading)
-                    const Center(
-                      child: CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          AppColors.primary,
-                        ),
-                      ),
-                    ),
-                  if (_errorMessage != null)
-                    Container(
-                      color: Colors.black.withOpacity(0.7),
-                      child: Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(
-                              Icons.error_outline,
-                              color: Colors.white,
-                              size: 50,
-                            ),
-                            const SizedBox(height: 16),
-                            Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 24,
-                              ),
-                              child: Text(
-                                _errorMessage!,
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 16,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 24),
-                            ElevatedButton(
-                              onPressed: _retryStream,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.primary,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 24,
-                                  vertical: 12,
-                                ),
-                              ),
-                              child: const Text(
-                                'RETRY CONNECTION',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                ],
-              ),
+        child: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Colors.black87, Colors.black54],
             ),
-
-            // Visitor Info Card
-            Positioned(
-              top: MediaQuery.of(context).padding.top + 20,
-              left: 20,
-              right: 20,
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 300),
-                child:
-                    _showControls
-                        ? _buildVisitorInfoCard()
-                        : _buildNotificationCard(),
-              ),
+          ),
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: _buildNotificationCard(),
             ),
-
-            // Controls
-            Positioned(
-              bottom: 40,
-              left: 0,
-              right: 0,
-              child: Column(
-                children: [
-                  AnimatedOpacity(
-                    opacity: _showControls ? 1.0 : 0.0,
-                    duration: const Duration(milliseconds: 300),
-                    child: _buildControlButtons(),
-                  ),
-                  const SizedBox(height: 20),
-                  FloatingActionButton(
-                    backgroundColor: AppColors.primary,
-                    onPressed: _toggleControls,
-                    child: Icon(
-                      _showControls
-                          ? Icons.keyboard_arrow_down
-                          : Icons.keyboard_arrow_up,
-                      color: Colors.white,
-                      size: 30,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -216,150 +69,116 @@ class _VisitorNotificationScreenState extends State<VisitorNotificationScreen>
 
   Widget _buildNotificationCard() {
     return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-      color: Colors.grey[800],
+      elevation: 8,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      color: AppColors.cardDark,
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(24),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                const CircleAvatar(
-                  backgroundColor: AppColors.primary,
-                  child: Icon(Icons.person, color: Colors.white),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary,
+                    borderRadius: BorderRadius.circular(50),
+                  ),
+                  child: const Icon(Icons.doorbell, color: Colors.white, size: 30),
                 ),
-                const SizedBox(width: 10),
-                Text(
-                  'Visitor Detected',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textOnDark,
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Visitor Alert',
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textOnDark,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Someone is at your door',
+                        style: TextStyle(
+                          color: Colors.grey[400],
+                          fontSize: 16,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 10),
-            const Text(
-              'Someone is at your door',
-              style: TextStyle(color: Colors.white),
-            ),
-            const SizedBox(height: 10),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                minimumSize: const Size(double.infinity, 45),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
+            const SizedBox(height: 24),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.grey[800],
+                borderRadius: BorderRadius.circular(12),
               ),
-              onPressed: _toggleControls,
-              child: const Text(
-                'VIEW LIVE STREAM',
-                style: TextStyle(color: Colors.white),
+              child: Row(
+                children: [
+                  const Icon(Icons.access_time, color: Colors.grey, size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Today at ${TimeOfDay.now().format(context)}',
+                    style: const TextStyle(color: Colors.grey, fontSize: 14),
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildVisitorInfoCard() {
-    return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-      color: Colors.grey[800],
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+            const SizedBox(height: 24),
             Row(
               children: [
-                const CircleAvatar(
-                  backgroundColor: AppColors.primary,
-                  child: Icon(Icons.person, color: Colors.white),
-                ),
-                const SizedBox(width: 10),
-                Text(
-                  'Visitor at Door',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textOnDark,
+                Expanded(
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      minimumSize: const Size(0, 50),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    onPressed: _openLiveStream,
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.videocam, color: Colors.white),
+                        SizedBox(width: 8),
+                        Text(
+                          'VIEW LIVE STREAM',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
+                ),
+                const SizedBox(width: 12),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.grey[700],
+                    minimumSize: const Size(50, 50),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  onPressed: () => Navigator.pop(context),
+                  child: const Icon(Icons.close, color: Colors.white),
                 ),
               ],
             ),
-            const SizedBox(height: 10),
-            Text(
-              'Today at ${TimeOfDay.now().format(context)}',
-              style: const TextStyle(color: Colors.white),
-            ),
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildControlButtons() {
-    return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-      color: Colors.grey[800],
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            _buildControlButton(
-              icon: _isTalking ? Icons.mic_off : Icons.mic,
-              label: _isTalking ? 'Mute' : 'Talk',
-              onPressed: _toggleTalking,
-              isActive: _isTalking,
-            ),
-            _buildControlButton(
-              icon: Icons.camera_alt,
-              label: 'Capture',
-              onPressed: () {
-                // TODO: Implement screenshot functionality
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildControlButton({
-    required IconData icon,
-    required String label,
-    required VoidCallback onPressed,
-    bool isActive = false,
-  }) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        CircleAvatar(
-          radius: 25,
-          backgroundColor: isActive ? AppColors.primary : Colors.grey[200],
-          child: IconButton(
-            icon: Icon(icon, color: isActive ? Colors.white : Colors.black54),
-            onPressed: onPressed,
-          ),
-        ),
-        const SizedBox(height: 5),
-        Text(
-          label,
-          style: TextStyle(
-            color: isActive ? AppColors.primary : Colors.grey[600],
-            fontSize: 12,
-          ),
-        ),
-      ],
     );
   }
 }

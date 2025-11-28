@@ -76,4 +76,4 @@ userSchema.methods.canRequestOTP = function() {
   return recentRequests < parseInt(process.env.MAX_OTP_REQUESTS_PER_HOUR || 3);
 };
 
-module.exports = mongoose.model('User', userSchema);
+module.exports = mongoose.model('User', userSchema, 'users_v2');

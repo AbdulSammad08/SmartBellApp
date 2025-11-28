@@ -2,6 +2,7 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const mongoose = require('mongoose');
 const { sendOTPEmail, sendPasswordResetOTP } = require('../utils/emailService');
 const { generateOTP, hashOTP, getOTPExpiry } = require('../utils/otpGenerator');
 const { validateRegister, validateLogin, validateOTP } = require('../middleware/validation');
@@ -11,11 +12,18 @@ const router = express.Router();
 
 // Register endpoint
 router.post('/register', validateRegister, async (req, res) => {
+  let normalizedEmail;
   try {
     const { email, password, name } = req.body;
+    
+    // Normalize email to lowercase for consistent checking
+    normalizedEmail = email.toLowerCase().trim();
+    console.log(`Registration attempt for email: ${normalizedEmail}`);
 
-    // Check if user already exists
-    const existingUser = await User.findOne({ email });
+    // Check if user already exists (case-insensitive)
+    const existingUser = await User.findOne({ email: normalizedEmail });
+    console.log(`Existing user found: ${existingUser ? 'YES' : 'NO'}`);
+    
     if (existingUser) {
       if (!existingUser.isVerified) {
         // User exists but not verified, resend OTP
@@ -38,7 +46,7 @@ router.post('/register', validateRegister, async (req, res) => {
         await existingUser.save();
 
         // Send OTP email
-        const emailSent = await sendOTPEmail(email, otp, name);
+        const emailSent = await sendOTPEmail(normalizedEmail, otp, name);
         if (!emailSent) {
           return res.status(500).json({
             success: false,
@@ -67,23 +75,68 @@ router.post('/register', validateRegister, async (req, res) => {
     const otpHash = await hashOTP(otp);
     const otpExpires = getOTPExpiry();
 
-    // Create user
-    const user = new User({
-      email,
+    // Create user using Mongoose with a workaround for stuck indexes
+    const userData = {
+      email: normalizedEmail,
       passwordHash,
       name,
       otpHash,
       otpExpires,
       lastOtpRequest: new Date(),
       otpAttempts: 1
-    });
-
-    await user.save();
+    };
+    
+    console.log(`Creating new user with email: ${normalizedEmail}`);
+    
+    // Use new collection to bypass corrupted indexes
+    const db = mongoose.connection.db;
+    const newCollectionName = 'users_v2';
+    
+    try {
+      // First ensure the new collection has proper indexes
+      await db.collection(newCollectionName).createIndex({ email: 1 }, { unique: true });
+    } catch (indexError) {
+      // Index might already exist, ignore error
+    }
+    
+    try {
+      const result = await db.collection(newCollectionName).insertOne({
+        ...userData,
+        isVerified: false,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      });
+      var user = { _id: result.insertedId, ...userData };
+      
+      // Migrate existing users to new collection if this is the first insert
+      const oldUsers = await db.collection('users').find({}).toArray();
+      if (oldUsers.length > 0) {
+        for (const oldUser of oldUsers) {
+          try {
+            await db.collection(newCollectionName).insertOne(oldUser);
+          } catch (migrateError) {
+            if (migrateError.code !== 11000) {
+              console.log('Migration error for user:', oldUser.email, migrateError.message);
+            }
+          }
+        }
+        console.log(`Migrated ${oldUsers.length} users to new collection`);
+      }
+      
+    } catch (dbError) {
+      if (dbError.code === 11000 && dbError.message.includes('email')) {
+        return res.status(400).json({
+          success: false,
+          message: 'User already exists with this email'
+        });
+      }
+      throw dbError;
+    }
 
     // Send OTP email
-    const emailSent = await sendOTPEmail(email, otp, name);
+    const emailSent = await sendOTPEmail(normalizedEmail, otp, name);
     if (!emailSent) {
-      await User.deleteOne({ _id: user._id });
+      await db.collection('users_v2').deleteOne({ _id: user._id });
       return res.status(500).json({
         success: false,
         message: 'Failed to send verification email'
@@ -100,9 +153,29 @@ router.post('/register', validateRegister, async (req, res) => {
     
     // Handle duplicate key error specifically
     if (error.code === 11000) {
+      console.log('Duplicate key error for email:', normalizedEmail);
+      // Check if it's an email duplicate or _id duplicate
+      if (error.message.includes('email')) {
+        return res.status(400).json({
+          success: false,
+          message: 'User already exists with this email'
+        });
+      } else {
+        // _id duplicate - retry with new ObjectId
+        console.log('ObjectId collision detected, this is very rare');
+        return res.status(500).json({
+          success: false,
+          message: 'Registration failed due to system conflict. Please try again.'
+        });
+      }
+    }
+    
+    // Handle validation errors
+    if (error.name === 'ValidationError') {
+      const validationErrors = Object.values(error.errors).map(err => err.message);
       return res.status(400).json({
         success: false,
-        message: 'User already exists with this email'
+        message: `Validation error: ${validationErrors.join(', ')}`
       });
     }
     
@@ -117,8 +190,9 @@ router.post('/register', validateRegister, async (req, res) => {
 router.post('/verify-otp', validateOTP, async (req, res) => {
   try {
     const { email, otp } = req.body;
+    const normalizedEmail = email.toLowerCase().trim();
 
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email: normalizedEmail });
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -186,8 +260,9 @@ router.post('/verify-otp', validateOTP, async (req, res) => {
 router.post('/login', validateLogin, async (req, res) => {
   try {
     const { email, password } = req.body;
+    const normalizedEmail = email.toLowerCase().trim();
 
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email: normalizedEmail });
     if (!user) {
       return res.status(401).json({
         success: false,
@@ -249,7 +324,8 @@ router.post('/resend-otp', otpLimiter, async (req, res) => {
       });
     }
 
-    const user = await User.findOne({ email });
+    const normalizedEmail = email.toLowerCase().trim();
+    const user = await User.findOne({ email: normalizedEmail });
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -318,7 +394,8 @@ router.post('/forgot-password', otpLimiter, async (req, res) => {
     }
 
     // Check if user exists and is verified
-    const user = await User.findOne({ email });
+    const normalizedEmail = email.toLowerCase().trim();
+    const user = await User.findOne({ email: normalizedEmail });
     if (!user || !user.isVerified) {
       return res.status(404).json({
         success: false,
@@ -379,7 +456,8 @@ router.post('/verify-reset-otp', async (req, res) => {
       });
     }
 
-    const user = await User.findOne({ email });
+    const normalizedEmail = email.toLowerCase().trim();
+    const user = await User.findOne({ email: normalizedEmail });
     if (!user || !user.isVerified) {
       return res.status(404).json({
         success: false,
@@ -546,7 +624,8 @@ router.post('/resend-reset-otp', otpLimiter, async (req, res) => {
       });
     }
 
-    const user = await User.findOne({ email });
+    const normalizedEmail = email.toLowerCase().trim();
+    const user = await User.findOne({ email: normalizedEmail });
     if (!user || !user.isVerified) {
       return res.status(404).json({
         success: false,
@@ -588,6 +667,74 @@ router.post('/resend-reset-otp', otpLimiter, async (req, res) => {
 
   } catch (error) {
     console.error('Resend reset OTP error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+});
+
+// Check email availability
+router.post('/check-email', async (req, res) => {
+  try {
+    const { email } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email is required'
+      });
+    }
+    
+    const normalizedEmail = email.toLowerCase().trim();
+    const existingUser = await User.findOne({ email: normalizedEmail });
+    
+    if (existingUser) {
+      return res.json({
+        success: false,
+        available: false,
+        message: existingUser.isVerified ? 'Email is already registered and verified' : 'Email is registered but not verified',
+        isVerified: existingUser.isVerified
+      });
+    }
+    
+    res.json({
+      success: true,
+      available: true,
+      message: 'Email is available'
+    });
+    
+  } catch (error) {
+    console.error('Email check error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+});
+
+// Delete user (for testing purposes)
+router.delete('/delete-user/:email', async (req, res) => {
+  try {
+    const { email } = req.params;
+    const normalizedEmail = email.toLowerCase().trim();
+    
+    const result = await User.deleteOne({ email: normalizedEmail });
+    
+    if (result.deletedCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+    
+    res.json({
+      success: true,
+      message: 'User deleted successfully'
+    });
+    
+  } catch (error) {
+    console.error('Delete user error:', error);
     res.status(500).json({
       success: false,
       message: 'Server error'

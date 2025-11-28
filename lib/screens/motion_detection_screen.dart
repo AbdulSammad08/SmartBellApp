@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../constants/colors.dart';
 import '../widgets/background_wrapper.dart';
+import '../services/api_service.dart';
 
 class MotionDetectionScreen extends StatefulWidget {
   const MotionDetectionScreen({super.key});
@@ -10,216 +11,98 @@ class MotionDetectionScreen extends StatefulWidget {
 }
 
 class _MotionDetectionScreenState extends State<MotionDetectionScreen> {
-  double _sensitivity = 5;
-  bool _isSensitivityChanged = false;
+  List<Map<String, dynamic>> currentDetections = [];
+  List<Map<String, dynamic>> historyDetections = [];
+  bool _isLoading = true;
 
-  List<Map<String, String>> activeAlerts = [
-    {'title': 'Motion Detected - Front Door', 'time': '2 mins ago'},
-    {'title': 'Movement in Backyard', 'time': '15 mins ago'},
-    {'title': 'Unknown Person Detected', 'time': '45 mins ago'},
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadMotionDetections();
+  }
 
-  List<Map<String, String>> detectionHistory = List.generate(
-    15,
-    (index) => {
-      'visitor': 'Visitor ${index + 1}',
-      'time': '${10 + DateTime.now().hour % 4}:${(DateTime.now().minute % 60).toString().padLeft(2, '0')}',
-      'duration': '${15 + index} sec',
-    },
-  );
-
-  Future<bool> _handleBackPressed() async {
-    if (!_isSensitivityChanged) return true;
-
-    final shouldSave = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppColors.cardDark,
-        title: Text('Unsaved Changes', style: TextStyle(color: AppColors.textOnDark)),
-        content: Text('You have unsaved changes. Do you want to save them before leaving?', 
-            style: TextStyle(color: Colors.grey[400])),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Discard', style: TextStyle(color: Colors.red)),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Save', style: TextStyle(color: AppColors.primary)),
-          ),
-        ],
-      ),
-    );
-
-    if (shouldSave == true) {
-      setState(() => _isSensitivityChanged = false);
-      _showSaveSuccessDialog();
+  Future<void> _loadMotionDetections() async {
+    try {
+      setState(() => _isLoading = true);
+      final response = await ApiService.getMotionDetections();
+      
+      if (response['success']) {
+        setState(() {
+          currentDetections = List<Map<String, dynamic>>.from(response['data']['current'] ?? []);
+          historyDetections = List<Map<String, dynamic>>.from(response['data']['history'] ?? []);
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to load motion detections: $e')),
+      );
     }
-    return shouldSave ?? false;
   }
 
-  void _showSaveSuccessDialog() {
-    showDialog(
+  Future<void> _deleteMotionDetection(String motionId) async {
+    final confirmed = await showDialog<bool>(
       context: context,
-      barrierDismissible: false,
       builder: (context) => AlertDialog(
         backgroundColor: AppColors.cardDark,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Icon(Icons.check_circle, color: Colors.green, size: 60),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              'Changes Saved!',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: AppColors.textOnDark,
-              ),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              'Sensitivity has been updated successfully',
-              style: TextStyle(color: Colors.grey[400]),
-            ),
-          ],
-        ),
+        title: const Text('Delete Motion Record', style: TextStyle(color: AppColors.textOnDark)),
+        content: const Text('Are you sure you want to delete this motion detection record?', style: TextStyle(color: Colors.grey)),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('OK', style: TextStyle(color: AppColors.primary)),
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
     );
-  }
 
-  Future<bool> _confirmDeletion(BuildContext context, String itemName, String type) async {
-    return await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            backgroundColor: AppColors.cardDark,
-            title: Text('Confirm Deletion', style: TextStyle(color: AppColors.textOnDark)),
-            content: Text('Are you sure you want to delete "$itemName" from $type?', 
-                style: TextStyle(color: Colors.grey[400])),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('Cancel', style: TextStyle(color: AppColors.primary)),
-              ),
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(true),
-                child: const Text('Delete', style: TextStyle(color: Colors.red)),
-              ),
-            ],
-          ),
-        ) ??
-        false;
-  }
-
-  void _showDeletedSnackBar(String type) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Successfully deleted from $type'),
-        backgroundColor: Colors.red,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    if (confirmed == true) {
+      try {
+        final response = await ApiService.deleteMotionDetection(motionId);
+        if (response['success']) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Motion record deleted successfully')),
+          );
+          _loadMotionDetections();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to delete: ${response['message']}')),
+          );
+        }
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error deleting record: $e')),
+        );
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return BackgroundWrapper(
-      child: WillPopScope(
-        onWillPop: _handleBackPressed,
-        child: Scaffold(
-          backgroundColor: Colors.transparent,
-          appBar: AppBar(
-            title: const Text(
-              'Motion Detection History',
-              style: TextStyle(color: AppColors.textOnDark),
-            ),
-            backgroundColor: Colors.black.withOpacity(0.5),
-            elevation: 1,
-            iconTheme: const IconThemeData(color: AppColors.textOnDark),
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          title: const Text(
+            'Motion Detection History',
+            style: TextStyle(color: AppColors.textOnDark),
           ),
-          body: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Sensitivity Adjustment Card
-                Card(
-                  color: AppColors.cardDark,
-                  elevation: 3,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(Icons.tune, color: AppColors.primary),
-                            const SizedBox(width: 10),
-                            Text(
-                              'Motion Detection Sensitivity',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.textOnDark,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        Slider(
-                          value: _sensitivity,
-                          min: 1,
-                          max: 10,
-                          divisions: 9,
-                          label: _sensitivity.round().toString(),
-                          activeColor: AppColors.primary,
-                          inactiveColor: Colors.grey[700],
-                          onChanged: (value) {
-                            setState(() {
-                              _sensitivity = value;
-                              _isSensitivityChanged = true;
-                            });
-                          },
-                        ),
-                        Center(
-                          child: Text(
-                            'Current Sensitivity: ${_sensitivity.round()}',
-                            style: TextStyle(color: Colors.grey[300]),
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        ElevatedButton(
-                          onPressed: _isSensitivityChanged
-                              ? () {
-                                  setState(() => _isSensitivityChanged = false);
-                                  _showSaveSuccessDialog();
-                                }
-                              : null,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            minimumSize: const Size(double.infinity, 40),
-                          ),
-                          child: const Text('Save Changes', style: TextStyle(color: Colors.white)),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
-
-                // Active Alerts Card
+          backgroundColor: Colors.black.withOpacity(0.5),
+          elevation: 1,
+          iconTheme: const IconThemeData(color: AppColors.textOnDark),
+        ),
+        body: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Current Detections Card
+              if (currentDetections.isNotEmpty)
                 Card(
                   color: AppColors.cardDark,
                   elevation: 3,
@@ -233,9 +116,9 @@ class _MotionDetectionScreenState extends State<MotionDetectionScreen> {
                             const Icon(Icons.notifications_active, color: Colors.red),
                             const SizedBox(width: 10),
                             Text(
-                              'Active Alerts',
+                              'Current Detections (Last 10 mins)',
                               style: TextStyle(
-                                fontSize: 20,
+                                fontSize: 18,
                                 fontWeight: FontWeight.bold,
                                 color: AppColors.textOnDark,
                               ),
@@ -244,12 +127,12 @@ class _MotionDetectionScreenState extends State<MotionDetectionScreen> {
                         ),
                         const SizedBox(height: 10),
                         SizedBox(
-                          height: 100,
+                          height: 120,
                           child: ListView.builder(
                             scrollDirection: Axis.horizontal,
-                            itemCount: activeAlerts.length,
+                            itemCount: currentDetections.length,
                             itemBuilder: (context, index) {
-                              final alert = activeAlerts[index];
+                              final detection = currentDetections[index];
                               return Container(
                                 width: 200,
                                 margin: const EdgeInsets.only(right: 10),
@@ -258,19 +141,34 @@ class _MotionDetectionScreenState extends State<MotionDetectionScreen> {
                                   borderRadius: BorderRadius.circular(10),
                                   border: Border.all(color: Colors.red.withOpacity(0.3)),
                                 ),
-                                child: ListTile(
-                                  leading: const Icon(Icons.warning_amber, color: Colors.red),
-                                  title: Text(alert['title']!, style: TextStyle(color: AppColors.textOnDark)),
-                                  subtitle: Text(alert['time']!, style: const TextStyle(color: Colors.red)),
-                                  trailing: IconButton(
-                                    icon: const Icon(Icons.delete, color: Colors.red),
-                                    onPressed: () async {
-                                      final confirmed = await _confirmDeletion(context, alert['title']!, 'Active Alerts');
-                                      if (confirmed) {
-                                        setState(() => activeAlerts.removeAt(index));
-                                        _showDeletedSnackBar('Active Alerts');
-                                      }
-                                    },
+                                child: Padding(
+                                  padding: const EdgeInsets.all(12),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          const Icon(Icons.motion_photos_on, color: Colors.red, size: 20),
+                                          const SizedBox(width: 5),
+                                          Expanded(
+                                            child: Text(
+                                              detection['location'] ?? 'Unknown',
+                                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        'Date: ${detection['date']}',
+                                        style: const TextStyle(color: Colors.grey, fontSize: 12),
+                                      ),
+                                      Text(
+                                        'Time: ${detection['time']}',
+                                        style: const TextStyle(color: Colors.red, fontSize: 12),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               );
@@ -281,66 +179,96 @@ class _MotionDetectionScreenState extends State<MotionDetectionScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 20),
+              const SizedBox(height: 20),
 
-                // Detection History Header
-                Text(
-                  'Detection History',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textOnDark,
-                  ),
+              // Detection History Header
+              Text(
+                'Detection History',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textOnDark,
                 ),
-                const SizedBox(height: 10),
+              ),
+              const SizedBox(height: 10),
 
-                // Detection History List
-                Expanded(
-                  child: ListView.separated(
-                    itemCount: detectionHistory.length,
-                    separatorBuilder: (context, index) => const Divider(color: Colors.grey),
-                    itemBuilder: (context, index) {
-                      final item = detectionHistory[index];
-                      return ListTile(
-                        leading: Container(
-                          width: 50,
-                          height: 50,
-                          decoration: BoxDecoration(
-                            color: AppColors.primary.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Icon(Icons.person_outline, color: Colors.grey),
-                        ),
-                        title: Text(item['visitor']!, style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.textOnDark)),
-                        subtitle: Text('Detected at ${item['time']}', style: const TextStyle(color: Colors.grey)),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Column(
+              // Detection History List
+              Expanded(
+                child: _isLoading
+                    ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
+                    : historyDetections.isEmpty
+                        ? Center(
+                            child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                const Text('Duration', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                                Text(item['duration']!, style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary)),
+                                const Icon(Icons.history, size: 60, color: Colors.grey),
+                                const SizedBox(height: 10),
+                                const Text(
+                                  'No motion history found',
+                                  style: TextStyle(color: Colors.grey, fontSize: 16),
+                                ),
+                                const SizedBox(height: 20),
+                                ElevatedButton(
+                                  onPressed: _loadMotionDetections,
+                                  child: const Text('Refresh'),
+                                ),
                               ],
                             ),
-                            IconButton(
-                              icon: const Icon(Icons.delete, color: Colors.red),
-                              onPressed: () async {
-                                final confirmed = await _confirmDeletion(context, item['visitor']!, 'Detection History');
-                                if (confirmed) {
-                                  setState(() => detectionHistory.removeAt(index));
-                                  _showDeletedSnackBar('Detection History');
-                                }
+                          )
+                        : RefreshIndicator(
+                            onRefresh: _loadMotionDetections,
+                            child: ListView.separated(
+                              itemCount: historyDetections.length,
+                              separatorBuilder: (context, index) => const Divider(color: Colors.grey),
+                              itemBuilder: (context, index) {
+                                final detection = historyDetections[index];
+                                return ListTile(
+                                  leading: Container(
+                                    width: 50,
+                                    height: 50,
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primary.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: const Icon(Icons.motion_photos_on, color: Colors.grey),
+                                  ),
+                                  title: Text(
+                                    detection['location'] ?? 'Motion Detected',
+                                    style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.textOnDark),
+                                  ),
+                                  subtitle: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Date: ${detection['date']}',
+                                        style: const TextStyle(color: Colors.grey, fontSize: 12),
+                                      ),
+                                      Text(
+                                        'Time: ${detection['time']}',
+                                        style: const TextStyle(color: Colors.grey, fontSize: 12),
+                                      ),
+                                    ],
+                                  ),
+                                  trailing: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        detection['_id']?.substring(0, 8) ?? '',
+                                        style: const TextStyle(color: AppColors.primary, fontSize: 10),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      IconButton(
+                                        icon: const Icon(Icons.delete, color: Colors.red, size: 20),
+                                        onPressed: () => _deleteMotionDetection(detection['_id']),
+                                      ),
+                                    ],
+                                  ),
+                                );
                               },
-                            )
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
+                            ),
+                          ),
+              ),
+            ],
           ),
         ),
       ),

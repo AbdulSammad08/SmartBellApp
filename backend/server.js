@@ -7,6 +7,7 @@ const authRoutes = require('./routes/auth');
 const subscriptionRoutes = require('./routes/subscription');
 const requestRoutes = require('./routes/requests');
 const visitorRoutes = require('./routes/visitors');
+const motionRoutes = require('./routes/motion');
 const { generalLimiter } = require('./middleware/rateLimiter');
 
 const app = express();
@@ -38,6 +39,7 @@ app.use('/api', authRoutes);
 app.use('/api/subscription', subscriptionRoutes);
 app.use('/api/requests', requestRoutes);
 app.use('/api/visitors', visitorRoutes);
+app.use('/api/motion', motionRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {

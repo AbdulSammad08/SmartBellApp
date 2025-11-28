@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../constants/colors.dart';
-import '../screens/visitor_notification_screen.dart';
+import '../screens/notification_center_screen.dart';
 import '../screens/motion_detection_screen.dart';
 import '../screens/facial_recognition_screen.dart';
 import '../screens/visitor_profile_screen.dart';
@@ -73,8 +73,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder:
-              (_) => VisitorNotificationScreen(streamUrl: feature['streamUrl']),
+          builder: (_) => const NotificationCenterScreen(),
         ),
       );
     } else {

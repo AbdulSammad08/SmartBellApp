@@ -96,7 +96,7 @@ class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
                               ),
                               const SizedBox(height: 8),
                               Text(
-                                'PKR ${(plan.price * 280).toStringAsFixed(0)}/${plan.duration}',
+                                'PKR ${plan.price.toStringAsFixed(0)}/${plan.duration}',
                                 style: TextStyle(
                                   fontSize: 20,
                                   color: AppColors.primary,
