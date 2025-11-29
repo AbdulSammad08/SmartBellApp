@@ -151,6 +151,14 @@ router.post('/register', validateRegister, async (req, res) => {
   } catch (error) {
     console.error('Registration error:', error);
     
+    // Handle network/database connection errors
+    if (error.name === 'MongoNetworkError' || error.code === 'EAI_AGAIN') {
+      return res.status(503).json({
+        success: false,
+        message: 'Database connection error. Please try again later.'
+      });
+    }
+    
     // Handle duplicate key error specifically
     if (error.code === 11000) {
       console.log('Duplicate key error for email:', normalizedEmail);
@@ -292,6 +300,13 @@ router.post('/login', validateLogin, async (req, res) => {
       { expiresIn: process.env.JWT_EXPIRES_IN }
     );
 
+    // Get subscription details
+    const UserSubscription = require('../models/UserSubscription');
+    const subscription = await UserSubscription.findOne({
+      userId: user._id,
+      status: 'active'
+    });
+
     res.json({
       success: true,
       message: 'Login successful',
@@ -300,6 +315,16 @@ router.post('/login', validateLogin, async (req, res) => {
         id: user._id,
         email: user.email,
         name: user.name
+      },
+      subscription: {
+        status: user.subscriptionStatus,
+        plan: user.subscriptionPlan,
+        features: subscription ? subscription.features : {
+          liveStream: false,
+          motionDetection: false,
+          facialRecognition: false,
+          visitorProfile: false
+        }
       }
     });
 

@@ -114,6 +114,8 @@ class _PaymentProofFormScreenState extends State<PaymentProofFormScreen> {
       setState(() => _isLoading = false);
 
       if (response.success) {
+        // Refresh subscription status after successful payment submission
+        await ApiService.getSubscriptionStatus();
         _showSuccessDialog();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(

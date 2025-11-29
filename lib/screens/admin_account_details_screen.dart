@@ -56,7 +56,7 @@ class AdminAccountDetailsScreen extends StatelessWidget {
                   const SizedBox(width: 12),
                   Expanded(
                     child: const Text(
-                      'JazeCash — Receipt as Payment',
+                      'Payment Details',
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
@@ -89,7 +89,7 @@ class AdminAccountDetailsScreen extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'Admin Contact Details',
+                        'Account Details',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
@@ -135,39 +135,6 @@ class AdminAccountDetailsScreen extends StatelessWidget {
                   ),
                 ),
               ],
-            ),
-            
-            const SizedBox(height: 15),
-            
-            // Payment Summary
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.primary, width: 2),
-              ),
-              child: Column(
-                children: [
-                  Text(
-                    '${plan.name} (${billingCycle == 'monthly' ? 'Monthly' : 'Yearly'})',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: AppColors.textOnDark,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'PKR ${(finalAmount * 280).toStringAsFixed(0)}',
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                ],
-              ),
             ),
             
             const SizedBox(height: 20),

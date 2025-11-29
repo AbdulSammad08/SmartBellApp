@@ -45,6 +45,24 @@ const userSchema = new mongoose.Schema({
   resetOtpExpires: {
     type: Date,
     default: null
+  },
+  subscriptionStatus: {
+    type: String,
+    enum: ['none', 'pending', 'active', 'expired'],
+    default: 'none'
+  },
+  subscriptionPlan: {
+    type: String,
+    enum: ['basic', 'premium', 'business', null],
+    default: null
+  },
+  subscriptionStartDate: {
+    type: Date,
+    default: null
+  },
+  subscriptionEndDate: {
+    type: Date,
+    default: null
   }
 }, {
   timestamps: true

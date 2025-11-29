@@ -8,7 +8,7 @@ const auth = require('../middleware/auth');
 // Get user's requests
 router.get('/user', auth, async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user.userId;
     console.log('Fetching requests for user:', userId);
     
     // Fetch requests without sorting first (Cosmos DB issue)
@@ -50,7 +50,7 @@ router.post('/submit', auth, async (req, res) => {
     console.log('User:', req.user);
     
     const { requestType, requestData } = req.body;
-    const userId = req.user.id;
+    const userId = req.user.userId;
     const userName = req.user.name;
     const userEmail = req.user.email;
 
@@ -98,7 +98,7 @@ router.put('/update/:requestId', auth, async (req, res) => {
     
     const { requestType, requestData } = req.body;
     const { requestId } = req.params;
-    const userId = req.user.id;
+    const userId = req.user.userId;
 
     let updatedRequest;
     const updateData = { ...requestData };
@@ -160,7 +160,7 @@ router.delete('/cancel/:requestId', auth, async (req, res) => {
     console.log('Cancel request received for ID:', req.params.requestId);
     
     const { requestId } = req.params;
-    const userId = req.user.id;
+    const userId = req.user.userId;
 
     // Try to find and delete from all request types
     const [ownershipResult, beneficialResult, secondaryResult] = await Promise.all([

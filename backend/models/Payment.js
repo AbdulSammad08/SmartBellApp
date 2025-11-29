@@ -53,6 +53,23 @@ const paymentSchema = new mongoose.Schema({
       },
       message: 'Device ID must be exactly 12 alphanumeric characters'
     }
+  },
+  status: {
+    type: String,
+    enum: ['pending', 'approved', 'rejected', 'confirmed'],
+    default: 'pending'
+  },
+  approvedBy: {
+    type: String,
+    default: null
+  },
+  approvedAt: {
+    type: Date,
+    default: null
+  },
+  rejectionReason: {
+    type: String,
+    default: null
   }
 }, {
   timestamps: true

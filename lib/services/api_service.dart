@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/subscription_plan.dart';
 import '../config/app_config.dart';
+import '../services/subscription_service.dart';
 
 class ApiService {
   static String? _workingBaseUrl;
@@ -103,10 +104,27 @@ class ApiService {
         }),
       ).timeout(AppConfig.connectionTimeout);
       
+      if (AppConfig.enableDebugLogs) {
+        print('Register response status: ${response.statusCode}');
+        print('Register response body: ${response.body}');
+      }
+      
       final responseData = jsonDecode(response.body);
-      return ApiResponse.fromJson(responseData);
+      
+      // Handle both 200 and 202 status codes as success
+      if (response.statusCode == 200 || response.statusCode == 202) {
+        return ApiResponse.fromJson(responseData);
+      } else {
+        return ApiResponse(
+          success: false,
+          message: responseData['message'] ?? 'Registration failed',
+        );
+      }
     } catch (e) {
       _workingBaseUrl = null;
+      if (AppConfig.enableDebugLogs) {
+        print('Register error: $e');
+      }
       return ApiResponse(
         success: false,
         message: 'Connection failed. Please check your internet connection.',
@@ -163,6 +181,9 @@ class ApiService {
             await _storeToken(apiResponse.token!);
             if (apiResponse.user != null) {
               await _storeUserInfo(apiResponse.user!);
+            }
+            if (apiResponse.subscription != null) {
+              await SubscriptionService.storeSubscription(apiResponse.subscription!);
             }
           }
           return apiResponse;
@@ -314,71 +335,101 @@ class ApiService {
     required double finalAmount,
     required String deviceId,
   }) async {
-    try {
-      final baseUrl = await _getWorkingBaseUrl();
-      final token = await _getStoredToken();
-      
-      if (token == null) {
-        return ApiResponse(
-          success: false,
-          message: 'Authentication required. Please login again.',
+    for (int attempt = 0; attempt < AppConfig.maxRetries; attempt++) {
+      try {
+        final baseUrl = await _getWorkingBaseUrl();
+        final token = await _getStoredToken();
+        
+        if (token == null) {
+          return ApiResponse(
+            success: false,
+            message: 'Authentication required. Please login again.',
+          );
+        }
+        
+        if (AppConfig.enableDebugLogs) {
+          print('🔐 Submitting payment (attempt ${attempt + 1}) with token: ${token.substring(0, 20)}...');
+        }
+        
+        var request = http.MultipartRequest(
+          'POST',
+          Uri.parse('$baseUrl/api/subscription/submit-payment'),
         );
-      }
-      
-      if (AppConfig.enableDebugLogs) {
-        print('🔐 Submitting payment with token: ${token.substring(0, 20)}...');
-      }
-      
-      var request = http.MultipartRequest(
-        'POST',
-        Uri.parse('$baseUrl/api/subscription/submit-payment'),
-      );
-      
-      request.headers['Authorization'] = 'Bearer $token';
-      
-      request.fields['userName'] = userName;
-      request.fields['contactNumber'] = contactNumber;
-      request.fields['planSelected'] = planSelected;
-      request.fields['billingCycle'] = billingCycle;
-      request.fields['finalAmount'] = finalAmount.toString();
-      request.fields['deviceId'] = deviceId;
-      
-      request.files.add(
-        await http.MultipartFile.fromPath('receiptFile', receiptFile.path),
-      );
-      
-      final streamedResponse = await request.send().timeout(AppConfig.connectionTimeout);
-      final response = await http.Response.fromStream(streamedResponse);
-      
-      if (AppConfig.enableDebugLogs) {
-        print('📡 Payment response status: ${response.statusCode}');
-        print('📡 Payment response body: ${response.body}');
-      }
-      
-      if (response.statusCode == 401) {
-        await _clearStoredToken();
-        return ApiResponse(
-          success: false,
-          message: 'Session expired. Please login again.',
+        
+        request.headers['Authorization'] = 'Bearer $token';
+        request.headers['Accept'] = 'application/json';
+        
+        request.fields['userName'] = userName;
+        request.fields['contactNumber'] = contactNumber;
+        request.fields['planSelected'] = planSelected;
+        request.fields['billingCycle'] = billingCycle;
+        request.fields['finalAmount'] = finalAmount.toString();
+        request.fields['deviceId'] = deviceId;
+        
+        request.files.add(
+          await http.MultipartFile.fromPath('receiptFile', receiptFile.path),
         );
+        
+        final streamedResponse = await request.send().timeout(const Duration(seconds: 15));
+        final response = await http.Response.fromStream(streamedResponse);
+        
+        if (AppConfig.enableDebugLogs) {
+          print('📡 Payment response status: ${response.statusCode}');
+          print('📡 Payment response body: ${response.body}');
+        }
+        
+        if (response.statusCode == 401) {
+          await _clearStoredToken();
+          return ApiResponse(
+            success: false,
+            message: 'Session expired. Please login again.',
+          );
+        }
+        
+        if (response.statusCode >= 200 && response.statusCode < 300) {
+          final responseData = jsonDecode(response.body);
+          return ApiResponse.fromJson(responseData);
+        } else {
+          final responseData = jsonDecode(response.body);
+          return ApiResponse(
+            success: false,
+            message: responseData['message'] ?? 'Server error: ${response.statusCode}',
+          );
+        }
+      } catch (e) {
+        _workingBaseUrl = null;
+        print('❌ Payment submission error (attempt ${attempt + 1}): $e');
+        
+        if (attempt == AppConfig.maxRetries - 1) {
+          return ApiResponse(
+            success: false,
+            message: 'Connection failed after ${AppConfig.maxRetries} attempts. Please check your internet connection and try again.',
+          );
+        }
+        
+        await Future.delayed(Duration(seconds: attempt + 1));
       }
-      
-      final responseData = jsonDecode(response.body);
-      return ApiResponse.fromJson(responseData);
-    } catch (e) {
-      _workingBaseUrl = null;
-      print('❌ Payment submission error: $e');
-      return ApiResponse(
-        success: false,
-        message: 'Connection failed. Please check your internet connection.',
-      );
     }
+    
+    return ApiResponse(
+      success: false,
+      message: 'Connection failed after multiple attempts.',
+    );
   }
   
   static Future<List<dynamic>> getUserRequests() async {
     try {
       final baseUrl = await _getWorkingBaseUrl();
       final token = await _getStoredToken();
+      
+      if (token == null) {
+        print('No token found for getUserRequests');
+        return [];
+      }
+      
+      if (AppConfig.enableDebugLogs) {
+        print('Fetching user-specific requests with token: ${token.substring(0, 20)}...');
+      }
       
       final response = await http.get(
         Uri.parse('$baseUrl/api/requests/user'),
@@ -388,6 +439,15 @@ class ApiService {
         },
       ).timeout(AppConfig.connectionTimeout);
       
+      if (AppConfig.enableDebugLogs) {
+        print('Get requests response status: ${response.statusCode}');
+      }
+      
+      if (response.statusCode == 401) {
+        await _clearStoredToken();
+        return [];
+      }
+      
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['success']) {
@@ -396,6 +456,7 @@ class ApiService {
       }
       return [];
     } catch (e) {
+      print('Error in getUserRequests: $e');
       _workingBaseUrl = null;
       return [];
     }
@@ -492,7 +553,9 @@ class ApiService {
         return [];
       }
       
-      print('Fetching visitors with token: ${token.substring(0, 20)}...');
+      if (AppConfig.enableDebugLogs) {
+        print('Fetching user-specific visitors with token: ${token.substring(0, 20)}...');
+      }
       
       final response = await http.get(
         Uri.parse('$baseUrl/api/visitors/user'),
@@ -502,8 +565,14 @@ class ApiService {
         },
       ).timeout(AppConfig.connectionTimeout);
       
-      print('Get visitors response status: ${response.statusCode}');
-      print('Get visitors response body: ${response.body}');
+      if (AppConfig.enableDebugLogs) {
+        print('Get visitors response status: ${response.statusCode}');
+      }
+      
+      if (response.statusCode == 401) {
+        await _clearStoredToken();
+        return [];
+      }
       
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -675,6 +744,7 @@ class ApiService {
       await prefs.remove('auth_token');
       await prefs.remove('user_name');
       await prefs.remove('user_email');
+      await SubscriptionService.clearSubscription();
       _workingBaseUrl = null; // Reset cached URL as well
       if (AppConfig.enableDebugLogs) {
         print('🗑️ Cleared stored authentication data');
@@ -721,6 +791,17 @@ class ApiService {
   
   static Future<void> clearStoredToken() async {
     await _clearStoredToken();
+  }
+  
+  // Force refresh subscription data from server
+  static Future<bool> refreshSubscriptionData() async {
+    try {
+      final response = await getSubscriptionStatus();
+      return response['success'] ?? false;
+    } catch (e) {
+      print('Error refreshing subscription data: $e');
+      return false;
+    }
   }
 
   // Motion Detection API methods
@@ -794,6 +875,78 @@ class ApiService {
       };
     }
   }
+
+  // Get subscription status
+  static Future<Map<String, dynamic>> getSubscriptionStatus() async {
+    for (int attempt = 0; attempt < AppConfig.maxRetries; attempt++) {
+      try {
+        final baseUrl = await _getWorkingBaseUrl();
+        final token = await _getStoredToken();
+        
+        if (token == null) {
+          return {
+            'success': false,
+            'message': 'Authentication required. Please login again.',
+          };
+        }
+        
+        final response = await http.get(
+          Uri.parse('$baseUrl/api/subscription/status'),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+        ).timeout(AppConfig.connectionTimeout);
+        
+        if (AppConfig.enableDebugLogs) {
+          print('📡 Subscription status response: ${response.statusCode}');
+          print('📡 Subscription status body: ${response.body}');
+        }
+        
+        if (response.statusCode == 401) {
+          await _clearStoredToken();
+          return {
+            'success': false,
+            'message': 'Session expired. Please login again.',
+          };
+        }
+        
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          if (data['success'] && data['subscription'] != null) {
+            await SubscriptionService.storeSubscription(data['subscription']);
+            if (AppConfig.enableDebugLogs) {
+              print('✅ Subscription data stored: ${data['subscription']}');
+            }
+          }
+          return data;
+        } else {
+          final data = jsonDecode(response.body);
+          return {
+            'success': false,
+            'message': data['message'] ?? 'Failed to get subscription status',
+          };
+        }
+      } catch (e) {
+        _workingBaseUrl = null;
+        print('❌ Subscription status error (attempt ${attempt + 1}): $e');
+        
+        if (attempt == AppConfig.maxRetries - 1) {
+          return {
+            'success': false,
+            'message': 'Connection failed: $e',
+          };
+        }
+        
+        await Future.delayed(Duration(seconds: attempt + 1));
+      }
+    }
+    
+    return {
+      'success': false,
+      'message': 'Connection failed after multiple attempts.',
+    };
+  }
 }
 
 class ApiResponse {
@@ -801,12 +954,14 @@ class ApiResponse {
   final String message;
   final String? token;
   final Map<String, dynamic>? user;
+  final Map<String, dynamic>? subscription;
   
   ApiResponse({
     required this.success,
     required this.message,
     this.token,
     this.user,
+    this.subscription,
   });
   
   factory ApiResponse.fromJson(Map<String, dynamic> json) {
@@ -815,6 +970,7 @@ class ApiResponse {
       message: json['message'] ?? '',
       token: json['token'],
       user: json['user'],
+      subscription: json['subscription'],
     );
   }
 }

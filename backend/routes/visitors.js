@@ -2,11 +2,12 @@ const express = require('express');
 const router = express.Router();
 const Visitor = require('../models/Visitor');
 const auth = require('../middleware/auth');
+const { requireSubscription, requireFeature } = require('../middleware/subscriptionAuth');
 
 // Get user's visitors
-router.get('/user', auth, async (req, res) => {
+router.get('/user', auth, requireSubscription, requireFeature('visitorProfile'), async (req, res) => {
   try {
-    const userId = req.user.id || req.user._id;
+    const userId = req.user.userId;
     console.log('Fetching visitors for user:', userId);
     const visitors = await Visitor.find({ userId }).sort({ createdAt: -1 });
     console.log('Found visitors:', visitors.length);
@@ -25,10 +26,10 @@ router.get('/user', auth, async (req, res) => {
 });
 
 // Create new visitor
-router.post('/create', auth, async (req, res) => {
+router.post('/create', auth, requireSubscription, requireFeature('visitorProfile'), async (req, res) => {
   try {
     const { name, email, phone, address, purpose, relationship } = req.body;
-    const userId = req.user.id || req.user._id;
+    const userId = req.user.userId;
     
     console.log('Creating visitor for user:', userId);
     console.log('Visitor data:', { name, email, phone, address, purpose, relationship });
@@ -61,11 +62,11 @@ router.post('/create', auth, async (req, res) => {
 });
 
 // Update visitor
-router.put('/update/:visitorId', auth, async (req, res) => {
+router.put('/update/:visitorId', auth, requireSubscription, requireFeature('visitorProfile'), async (req, res) => {
   try {
     const { visitorId } = req.params;
     const { name, email, phone, address, purpose, relationship } = req.body;
-    const userId = req.user.id || req.user._id;
+    const userId = req.user.userId;
 
     console.log('Updating visitor:', visitorId, 'for user:', userId);
 
@@ -99,10 +100,10 @@ router.put('/update/:visitorId', auth, async (req, res) => {
 });
 
 // Delete visitor
-router.delete('/delete/:visitorId', auth, async (req, res) => {
+router.delete('/delete/:visitorId', auth, requireSubscription, requireFeature('visitorProfile'), async (req, res) => {
   try {
     const { visitorId } = req.params;
-    const userId = req.user.id || req.user._id;
+    const userId = req.user.userId;
 
     console.log('Deleting visitor:', visitorId, 'for user:', userId);
 

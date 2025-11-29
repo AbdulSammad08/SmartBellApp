@@ -1,104 +1,69 @@
-import 'package:flutter/material.dart'; 
+import 'package:flutter/material.dart';
+import '../services/subscription_service.dart';
+import '../services/api_service.dart';
 import '../constants/colors.dart';
-import '../screens/payment_confirmation_screen.dart';
 import '../widgets/background_wrapper.dart';
+import 'subscription_plans_screen.dart';
 
 class SubscriptionCenterScreen extends StatefulWidget {
-  const SubscriptionCenterScreen({super.key});
+  const SubscriptionCenterScreen({Key? key}) : super(key: key);
 
   @override
   State<SubscriptionCenterScreen> createState() => _SubscriptionCenterScreenState();
 }
 
 class _SubscriptionCenterScreenState extends State<SubscriptionCenterScreen> {
-  int? selectedPlan;
-  String? selectedPaymentMethod;
-  final Map<String, String> mobileNumbers = {'easypaisa': '', 'jazzcash': ''};
-  String? errorMessage;
-  final _formKey = GlobalKey<FormState>();
+  bool _isLoading = true;
+  Map<String, dynamic>? _subscriptionData;
+  Map<String, dynamic>? _pendingPayment;
 
-  final List<Map<String, dynamic>> plans = [
-    {
-      'title': 'Basic (1-2 Devices)',
-      'price': '300 PKR',
-      'devices': '1-2',
-      'features': ['Cloud Storage', 'Smart Alerts'],
-    },
-    {
-      'title': 'Standard (3-5 Devices)',
-      'price': '600 PKR',
-      'devices': '3-5',
-      'features': ['Cloud Storage', 'Smart Alerts'],
-    },
-    {
-      'title': 'Premium (6-8 Devices)',
-      'price': '900 PKR',
-      'devices': '6-8',
-      'features': ['Cloud Storage', 'Smart Alerts'],
-    },
-    {
-      'title': 'Enterprise (9-12 Devices)',
-      'price': '1300 PKR',
-      'devices': '9+',
-      'features': ['Cloud Storage', 'Smart Alerts'],
-    },
-  ];
-
-  String? validateMobileNumber(String? value) {
-    if (value == null || value.isEmpty) return 'Enter mobile number';
-    if (value.length != 11 || !value.startsWith('03')) {
-      return 'Invalid 11-digit mobile number';
-    }
-    return null;
+  @override
+  void initState() {
+    super.initState();
+    _loadSubscriptionData();
   }
 
-  Widget _buildPaymentMethodCard(String title, IconData icon, String number) {
-    return GestureDetector(
-      onTap: () => setState(() => selectedPaymentMethod = title.toLowerCase()),
-      child: Column(
-        children: [
-          Card(
-            elevation: 3,
-            color: AppColors.cardDark,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-              side: BorderSide(
-                color: selectedPaymentMethod == title.toLowerCase()
-                    ? AppColors.primary
-                    : Colors.grey.shade700,
-              ),
+  Future<void> _loadSubscriptionData() async {
+    setState(() {
+      _isLoading = true;
+    });
+    
+    try {
+      final response = await ApiService.getSubscriptionStatus();
+      if (response['success']) {
+        setState(() {
+          _subscriptionData = response['subscription'];
+          _pendingPayment = response['pendingPayment'];
+          _isLoading = false;
+        });
+      } else {
+        setState(() {
+          _isLoading = false;
+        });
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(response['message'] ?? 'Failed to load subscription data'),
+              backgroundColor: Colors.orange,
             ),
-            child: Padding(
-              padding: const EdgeInsets.all(15),
-              child: Column(
-                children: [
-                  Icon(icon, size: 40, color: AppColors.primary),
-                  const SizedBox(height: 10),
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+          );
+        }
+      }
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading subscription data: $e'),
+            backgroundColor: Colors.red,
           ),
-          if (number.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Text(
-                number,
-                style: const TextStyle(
-                  color: Colors.green,
-                  fontSize: 12,
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
+        );
+      }
+    }
   }
 
   @override
@@ -108,221 +73,313 @@ class _SubscriptionCenterScreenState extends State<SubscriptionCenterScreen> {
         backgroundColor: Colors.transparent,
         appBar: AppBar(
           backgroundColor: Colors.black.withOpacity(0.5),
-          iconTheme: const IconThemeData(color: AppColors.textOnDark),
           title: const Text(
-            'Subscription Plans',
-            style: TextStyle(color: AppColors.textOnDark),
+            'Subscription Center',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
           ),
-          elevation: 1,
+          iconTheme: const IconThemeData(color: Colors.white),
         ),
         body: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Choose Your Plan',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 20),
-                GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    childAspectRatio: 0.8,
-                    crossAxisSpacing: 15,
-                    mainAxisSpacing: 15,
-                  ),
-                  itemCount: plans.length,
-                  itemBuilder: (context, index) {
-                    return AnimatedContainer(
-                      duration: const Duration(milliseconds: 300),
-                      decoration: BoxDecoration(
-                        color: selectedPlan == index
-                            ? AppColors.primary.withOpacity(0.2)
-                            : AppColors.cardDark,
-                        borderRadius: BorderRadius.circular(15),
-                        border: Border.all(
-                          color: selectedPlan == index
-                              ? AppColors.primary
-                              : Colors.grey.shade700,
+                padding: const EdgeInsets.all(20),
+                child: _isLoading
+                    ? const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(50),
+                          child: CircularProgressIndicator(),
                         ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black26,
-                            blurRadius: 10,
-                            offset: const Offset(0, 5),
-                          ),
+                      )
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildSubscriptionStatus(),
+                          const SizedBox(height: 20),
+                          if (_pendingPayment != null) _buildPendingPayment(),
+                          const SizedBox(height: 20),
+                          _buildFeatureAccess(),
+                          const SizedBox(height: 30),
+                          _buildActionButtons(),
                         ],
                       ),
-                      child: InkWell(
-                        onTap: () {
-                          setState(() {
-                            selectedPlan = index;
-                            selectedPaymentMethod = null;
-                          });
-                        },
-                        borderRadius: BorderRadius.circular(15),
-                        child: Padding(
-                          padding: const EdgeInsets.all(15),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                plans[index]['title'],
-                                style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              const SizedBox(height: 10),
-                              Text(
-                                plans[index]['price'],
-                                style: const TextStyle(
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.w900,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              const SizedBox(height: 15),
-                              ...plans[index]['features']
-                                  .map<Widget>((feature) => Padding(
-                                        padding: const EdgeInsets.symmetric(vertical: 4),
-                                        child: Row(
-                                          children: [
-                                            Icon(Icons.check_circle,
-                                                color: AppColors.primary, size: 18),
-                                            const SizedBox(width: 8),
-                                            Text(
-                                              feature,
-                                              style: const TextStyle(
-                                                color: Colors.white70,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ))
-                                  .toList(),
-                              const Spacer(),
-                            ],
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-                const SizedBox(height: 30),
-                if (selectedPlan != null) ...[
-                  const Divider(color: Colors.white70),
-                  const SizedBox(height: 20),
-                  const Text(
-                    'Select Payment Method',
+              ),
+      ),
+    );
+  }
+
+  Widget _buildSubscriptionStatus() {
+    final status = _subscriptionData?['status'] ?? 'none';
+    final plan = _subscriptionData?['plan'];
+    
+    Color statusColor;
+    String statusText;
+    IconData statusIcon;
+    
+    switch (status) {
+      case 'active':
+        statusColor = Colors.green;
+        statusText = 'Active';
+        statusIcon = Icons.check_circle;
+        break;
+      case 'pending':
+        statusColor = Colors.orange;
+        statusText = 'Pending Approval';
+        statusIcon = Icons.pending;
+        break;
+      case 'expired':
+        statusColor = Colors.red;
+        statusText = 'Expired';
+        statusIcon = Icons.error;
+        break;
+      default:
+        statusColor = Colors.grey;
+        statusText = 'No Subscription';
+        statusIcon = Icons.cancel;
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.7),
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: statusColor, width: 2),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(statusIcon, color: statusColor, size: 30),
+              const SizedBox(width: 15),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Subscription Status',
                     style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 14,
+                    ),
+                  ),
+                  Text(
+                    statusText,
+                    style: TextStyle(
+                      color: statusColor,
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
-                      color: Colors.white,
                     ),
                   ),
-                  const SizedBox(height: 20),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildPaymentMethodCard(
-                          'EasyPaisa',
-                          Icons.account_balance_wallet,
-                          mobileNumbers['easypaisa']!,
-                        ),
-                      ),
-                      const SizedBox(width: 15),
-                      Expanded(
-                        child: _buildPaymentMethodCard(
-                          'JazzCash',
-                          Icons.payment,
-                          mobileNumbers['jazzcash']!,
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (selectedPaymentMethod != null) ...[
-                    const SizedBox(height: 20),
-                    TextFormField(
-                      style: const TextStyle(color: Colors.white),
-                      decoration: InputDecoration(
-                        labelText: 'Enter $selectedPaymentMethod Mobile Number',
-                        labelStyle: const TextStyle(color: Colors.white),
-                        hintText: '03XX-XXXXXXX',
-                        hintStyle: const TextStyle(color: Colors.white54),
-                        border: const OutlineInputBorder(),
-                        errorText: errorMessage,
-                      ),
-                      keyboardType: TextInputType.phone,
-                      validator: validateMobileNumber,
-                      onChanged: (value) {
-                        final validation = validateMobileNumber(value);
-                        setState(() {
-                          errorMessage = validation;
-                          if (validation == null) {
-                            mobileNumbers[selectedPaymentMethod!] = value;
-                          } else {
-                            mobileNumbers[selectedPaymentMethod!] = '';
-                          }
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 20),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 50,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor:
-                              mobileNumbers[selectedPaymentMethod]!.isNotEmpty
-                                  ? AppColors.primary
-                                  : Colors.grey,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                        onPressed: mobileNumbers[selectedPaymentMethod]!.isNotEmpty
-                            ? () {
-                                if (_formKey.currentState!.validate()) {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => PaymentConfirmationScreen(
-                                        paymentMethod: selectedPaymentMethod!,
-                                        mobileNumber: mobileNumbers[selectedPaymentMethod]!,
-                                        planName: plans[selectedPlan!]['title'],
-                                        amount: plans[selectedPlan!]['price'],
-                                        invoiceId: 'INV-${DateTime.now().millisecondsSinceEpoch}',
-                                      ),
-                                    ),
-                                  );
-                                }
-                              }
-                            : null,
-                        child: const Text(
-                          'Proceed to Payment',
-                          style: TextStyle(color: Colors.white),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                  ]
                 ],
-              ],
+              ),
+            ],
+          ),
+          if (plan != null) ...[
+            const SizedBox(height: 15),
+            Text(
+              'Current Plan: ${plan.toString().toUpperCase()}',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPendingPayment() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.orange.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: Colors.orange, width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.pending_actions, color: Colors.orange, size: 24),
+              const SizedBox(width: 10),
+              Text(
+                'Pending Payment',
+                style: TextStyle(
+                  color: Colors.orange,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Plan: ${_pendingPayment!['planSelected']}',
+            style: const TextStyle(color: Colors.white, fontSize: 14),
+          ),
+          Text(
+            'Amount: \$${_pendingPayment!['finalAmount']}',
+            style: const TextStyle(color: Colors.white, fontSize: 14),
+          ),
+          Text(
+            'Submitted: ${DateTime.parse(_pendingPayment!['submittedAt']).toLocal().toString().split('.')[0]}',
+            style: const TextStyle(color: Colors.white70, fontSize: 12),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Your payment is being reviewed by our admin team. You will be notified once approved.',
+            style: TextStyle(
+              color: Colors.white70,
+              fontSize: 12,
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFeatureAccess() {
+    final features = _subscriptionData?['features'] ?? {
+      'liveStream': false,
+      'motionDetection': false,
+      'facialRecognition': false,
+      'visitorProfile': false,
+    };
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.7),
+        borderRadius: BorderRadius.circular(15),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Feature Access',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 15),
+          _buildFeatureItem('Live Stream', features['liveStream'] ?? false),
+          _buildFeatureItem('Motion Detection', features['motionDetection'] ?? false),
+          _buildFeatureItem('Facial Recognition', features['facialRecognition'] ?? false),
+          _buildFeatureItem('Visitor Profile', features['visitorProfile'] ?? false),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFeatureItem(String feature, bool hasAccess) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          Icon(
+            hasAccess ? Icons.check_circle : Icons.cancel,
+            color: hasAccess ? Colors.green : Colors.red,
+            size: 20,
+          ),
+          const SizedBox(width: 10),
+          Text(
+            feature,
+            style: TextStyle(
+              color: hasAccess ? Colors.white : Colors.white60,
+              fontSize: 14,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionButtons() {
+    final status = _subscriptionData?['status'] ?? 'none';
+    
+    return Column(
+      children: [
+        if (status == 'none' || status == 'expired')
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const SubscriptionPlansScreen(),
+                  ),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                padding: const EdgeInsets.symmetric(vertical: 15),
+              ),
+              child: const Text(
+                'Subscribe Now',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
+        if (status == 'active')
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const SubscriptionPlansScreen(),
+                  ),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                padding: const EdgeInsets.symmetric(vertical: 15),
+              ),
+              child: const Text(
+                'Upgrade Plan',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
+        const SizedBox(height: 10),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: _isLoading ? null : _loadSubscriptionData,
+            icon: _isLoading 
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  )
+                : const Icon(Icons.refresh, color: Colors.white),
+            label: Text(
+              _isLoading ? 'Refreshing...' : 'Refresh Status',
+              style: const TextStyle(color: Colors.white),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.grey[700],
+              padding: const EdgeInsets.symmetric(vertical: 12),
             ),
           ),
         ),
-      ),
+      ],
     );
   }
 }
