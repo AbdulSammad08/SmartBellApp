@@ -108,10 +108,37 @@ class _LoginScreenState extends State<LoginScreen> {
                                   setState(() => _isLoading = false);
                                   
                                   if (response.success) {
-                                    Navigator.pushReplacementNamed(
-                                      context,
-                                      '/dashboard',
-                                    );
+                                    // Check subscription status to determine navigation
+                                    if (response.subscription != null && 
+                                        response.subscription!['status'] != null) {
+                                      final subscriptionStatus = response.subscription!['status'];
+                                      
+                                      if (subscriptionStatus == 'none' || subscriptionStatus == 'expired') {
+                                        // No subscription - redirect to subscription plans
+                                        Navigator.pushReplacementNamed(
+                                          context,
+                                          '/subscription-plans',
+                                        );
+                                      } else if (subscriptionStatus == 'pending') {
+                                        // Pending subscription - redirect to subscription status
+                                        Navigator.pushReplacementNamed(
+                                          context,
+                                          '/subscription-status',
+                                        );
+                                      } else {
+                                        // Active subscription - redirect to dashboard
+                                        Navigator.pushReplacementNamed(
+                                          context,
+                                          '/dashboard',
+                                        );
+                                      }
+                                    } else {
+                                      // No subscription data - redirect to subscription plans
+                                      Navigator.pushReplacementNamed(
+                                        context,
+                                        '/subscription-plans',
+                                      );
+                                    }
                                     
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(

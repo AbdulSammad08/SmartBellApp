@@ -8,6 +8,7 @@ import 'screens/dashboard_screen.dart';
 import 'screens/request_transfer_screen.dart';
 import 'screens/visitor_notification_screen.dart'; // Add this import
 import 'screens/subscription_center_screen.dart';
+import 'screens/subscription_plans_screen.dart';
 import 'constants/colors.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -157,6 +158,8 @@ class _SmartDoorBellAppState extends State<SmartDoorBellApp> {
 
         '/about-us': (context) => const RequestTransferScreen(),
         '/subscription-center': (context) => const SubscriptionCenterScreen(),
+        '/subscription-plans': (context) => const SubscriptionPlansScreen(),
+        '/subscription-status': (context) => const SubscriptionCenterScreen(),
         '/visitor-notification':
             (context) => VisitorNotificationScreen(
               streamUrl: ModalRoute.of(context)!.settings.arguments as String,

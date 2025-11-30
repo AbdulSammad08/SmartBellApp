@@ -78,11 +78,41 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
       setState(() => _isLoading = false);
 
       if (response.success) {
-        Navigator.pushNamedAndRemoveUntil(
-          context,
-          '/dashboard',
-          (route) => false,
-        );
+        // Check subscription status to determine navigation
+        if (response.subscription != null && 
+            response.subscription!['status'] != null) {
+          final subscriptionStatus = response.subscription!['status'];
+          
+          if (subscriptionStatus == 'none' || subscriptionStatus == 'expired') {
+            // No subscription - redirect to subscription plans
+            Navigator.pushNamedAndRemoveUntil(
+              context,
+              '/subscription-plans',
+              (route) => false,
+            );
+          } else if (subscriptionStatus == 'pending') {
+            // Pending subscription - redirect to subscription status
+            Navigator.pushNamedAndRemoveUntil(
+              context,
+              '/subscription-status',
+              (route) => false,
+            );
+          } else {
+            // Active subscription - redirect to dashboard
+            Navigator.pushNamedAndRemoveUntil(
+              context,
+              '/dashboard',
+              (route) => false,
+            );
+          }
+        } else {
+          // No subscription data - redirect to subscription plans
+          Navigator.pushNamedAndRemoveUntil(
+            context,
+            '/subscription-plans',
+            (route) => false,
+          );
+        }
         
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

@@ -83,7 +83,11 @@ router.post('/register', validateRegister, async (req, res) => {
       otpHash,
       otpExpires,
       lastOtpRequest: new Date(),
-      otpAttempts: 1
+      otpAttempts: 1,
+      subscriptionStatus: 'none',
+      subscriptionPlan: null,
+      subscriptionStartDate: null,
+      subscriptionEndDate: null
     };
     
     console.log(`Creating new user with email: ${normalizedEmail}`);
@@ -252,6 +256,18 @@ router.post('/verify-otp', validateOTP, async (req, res) => {
         id: user._id,
         email: user.email,
         name: user.name
+      },
+      subscription: {
+        status: user.subscriptionStatus || 'none',
+        plan: user.subscriptionPlan || null,
+        startDate: user.subscriptionStartDate || null,
+        endDate: user.subscriptionEndDate || null,
+        features: {
+          liveStream: false,
+          motionDetection: false,
+          facialRecognition: false,
+          visitorProfile: false
+        }
       }
     });
 
@@ -317,8 +333,10 @@ router.post('/login', validateLogin, async (req, res) => {
         name: user.name
       },
       subscription: {
-        status: user.subscriptionStatus,
-        plan: user.subscriptionPlan,
+        status: user.subscriptionStatus || 'none',
+        plan: user.subscriptionPlan || null,
+        startDate: user.subscriptionStartDate || null,
+        endDate: user.subscriptionEndDate || null,
         features: subscription ? subscription.features : {
           liveStream: false,
           motionDetection: false,
