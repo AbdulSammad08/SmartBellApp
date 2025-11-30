@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import '../constants/colors.dart';
 import '../screens/notification_center_screen.dart';
 import '../screens/motion_detection_screen.dart';
-import '../screens/facial_recognition_screen.dart';
+import '../screens/face_recognition_screen.dart';
+import '../screens/face_enrollment_screen.dart';
 import '../screens/visitor_profile_screen.dart';
 import '../screens/request_transfer_screen.dart';
 import '../screens/configure_wifi_screen.dart';
@@ -135,7 +136,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         'Facial Recognition': SubscriptionGuard(
           requiredFeature: 'facialRecognition',
           featureName: 'Facial Recognition',
-          child: const FacialRecognitionScreen(),
+          child: const FaceRecognitionScreen(),
         ),
         'Motion Detection': SubscriptionGuard(
           requiredFeature: 'motionDetection',
