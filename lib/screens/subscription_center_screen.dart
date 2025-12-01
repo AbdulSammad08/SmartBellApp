@@ -6,7 +6,7 @@ import '../widgets/background_wrapper.dart';
 import 'subscription_plans_screen.dart';
 
 class SubscriptionCenterScreen extends StatefulWidget {
-  const SubscriptionCenterScreen({Key? key}) : super(key: key);
+  const SubscriptionCenterScreen({super.key});
 
   @override
   State<SubscriptionCenterScreen> createState() => _SubscriptionCenterScreenState();

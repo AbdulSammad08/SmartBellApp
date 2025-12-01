@@ -11,6 +11,8 @@ import 'screens/subscription_center_screen.dart';
 import 'screens/subscription_plans_screen.dart';
 import 'screens/face_recognition_screen.dart';
 import 'screens/face_enrollment_screen.dart';
+import 'screens/esp32_devices_screen.dart';
+import 'screens/live_stream_screen.dart';
 import 'constants/colors.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -164,6 +166,11 @@ class _SmartDoorBellAppState extends State<SmartDoorBellApp> {
         '/subscription-status': (context) => const SubscriptionCenterScreen(),
         '/face-recognition': (context) => const FaceRecognitionScreen(),
         '/face-enrollment': (context) => const FaceEnrollmentScreen(),
+        '/esp32-devices': (context) => const ESP32DevicesScreen(),
+        '/live-stream': (context) => const LiveStreamScreen(
+          videoUrl: 'http://192.168.100.137/stream',
+          audioUrl: 'http://192.168.100.138',
+        ),
         '/visitor-notification':
             (context) => VisitorNotificationScreen(
               streamUrl: ModalRoute.of(context)!.settings.arguments as String,

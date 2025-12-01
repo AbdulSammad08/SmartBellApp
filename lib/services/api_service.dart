@@ -600,15 +600,7 @@ class ApiService {
         );
       }
       
-      // Verify token is still valid before making the request
-      final isValid = await _isTokenValid();
-      if (!isValid) {
-        await _clearStoredToken();
-        return ApiResponse(
-          success: false,
-          message: 'Session expired. Please login again.',
-        );
-      }
+
       
       if (AppConfig.enableDebugLogs) {
         print('👥 Creating visitor with data: $visitorData');
@@ -646,6 +638,17 @@ class ApiService {
         success: false,
         message: 'Connection failed: $e',
       );
+    }
+  }
+  
+  static String? convertImageToBase64(File? imageFile) {
+    if (imageFile == null) return null;
+    try {
+      final bytes = imageFile.readAsBytesSync();
+      return 'data:image/jpeg;base64,${base64Encode(bytes)}';
+    } catch (e) {
+      print('Error converting image to base64: $e');
+      return null;
     }
   }
   
@@ -754,36 +757,7 @@ class ApiService {
     }
   }
   
-  static Future<bool> _isTokenValid() async {
-    try {
-      final baseUrl = await _getWorkingBaseUrl();
-      final token = await _getStoredToken();
-      
-      if (token == null) return false;
-      
-      final response = await http.get(
-        Uri.parse('$baseUrl/api/auth/verify-token'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      ).timeout(const Duration(seconds: 3));
-      
-      if (AppConfig.enableDebugLogs) {
-        print('🔍 Token validation response: ${response.statusCode}');
-        if (response.statusCode != 200) {
-          print('🔍 Token validation body: ${response.body}');
-        }
-      }
-      
-      return response.statusCode == 200;
-    } catch (e) {
-      if (AppConfig.enableDebugLogs) {
-        print('❌ Token validation error: $e');
-      }
-      return false;
-    }
-  }
+
   
   static Future<String?> getStoredToken() async {
     return await _getStoredToken();

@@ -36,6 +36,18 @@ const visitorSchema = new mongoose.Schema({
     type: String,
     required: true,
     trim: true
+  },
+  imageUrl: {
+    type: String, // Azure Blob Storage URL
+    required: false
+  },
+  imageFileName: {
+    type: String, // For blob deletion
+    required: false
+  },
+  faceEmbedding: {
+    type: [Number], // Face recognition embedding
+    required: false
   }
 }, {
   timestamps: true

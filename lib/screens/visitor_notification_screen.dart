@@ -37,7 +37,10 @@ class _VisitorNotificationScreenState extends State<VisitorNotificationScreen>
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => LiveStreamScreen(streamUrl: widget.streamUrl),
+        builder: (context) => const LiveStreamScreen(
+          videoUrl: 'http://192.168.100.137/stream',
+          audioUrl: 'http://192.168.100.138',
+        ),
       ),
     );
   }

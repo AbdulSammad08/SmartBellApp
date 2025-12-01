@@ -3,7 +3,7 @@ import '../constants/colors.dart';
 import '../screens/notification_center_screen.dart';
 import '../screens/motion_detection_screen.dart';
 import '../screens/face_recognition_screen.dart';
-import '../screens/face_enrollment_screen.dart';
+import '../screens/esp32_devices_screen.dart';
 import '../screens/visitor_profile_screen.dart';
 import '../screens/request_transfer_screen.dart';
 import '../screens/configure_wifi_screen.dart';
@@ -65,8 +65,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       'icon': Icons.notifications,
       'color': AppColors.primary,
       'requiresStream': true,
-      'streamUrl':
-          'http://192.168.159.16/stream', // Replace with your ESP32 CAM IP
+      'streamUrl': 'http://192.168.100.137/stream',
     },
     {
       'title': 'Facial Recognition',
@@ -102,6 +101,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
       'title': 'Configure Wi-Fi',
       'icon': Icons.wifi,
       'color': Colors.teal,
+      'requiresStream': false,
+    },
+    {
+      'title': 'ESP32 Devices',
+      'icon': Icons.devices,
+      'color': Colors.indigo,
       'requiresStream': false,
     },
   ];
@@ -151,6 +156,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
         'Request': const RequestTransferScreen(),
         'Configure Wi-Fi': const ConfigureWiFiScreen(),
+        'ESP32 Devices': const ESP32DevicesScreen(),
       };
 
       if (routes.containsKey(feature['title'])) {
@@ -262,9 +268,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   const SizedBox(height: 16),
                   Row(
                     children: [
-                      const Spacer(),
-                      Expanded(flex: 2, child: _buildFeatureBox(6)),
-                      const Spacer(),
+                      Expanded(child: _buildFeatureBox(6)),
+                      const SizedBox(width: 16),
+                      Expanded(child: _buildFeatureBox(7)),
                     ],
                   ),
                 ],

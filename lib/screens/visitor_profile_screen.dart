@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import '../constants/colors.dart';
 import '../widgets/background_wrapper.dart';
 import '../services/api_service.dart';
@@ -25,6 +27,10 @@ class _VisitorProfileScreenState extends State<VisitorProfileScreen> {
   final _addressController = TextEditingController();
   final _purposeController = TextEditingController();
   final _relationshipController = TextEditingController();
+  
+  // Image handling
+  File? _selectedImage;
+  final ImagePicker _picker = ImagePicker();
 
   @override
   void initState() {
@@ -161,31 +167,60 @@ class _VisitorProfileScreenState extends State<VisitorProfileScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Expanded(
-                  child: Text(
-                    visitor['name'] ?? 'Unknown',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
+                // Profile Image
+                Container(
+                  width: 50,
+                  height: 50,
+                  margin: const EdgeInsets.only(right: 12),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(25),
+                    color: Colors.grey[700],
                   ),
+                  child: visitor['imageUrl'] != null
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(25),
+                          child: Image.network(
+                            visitor['imageUrl'],
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Icon(Icons.person, color: Colors.grey[400]);
+                            },
+                          ),
+                        )
+                      : Icon(Icons.person, color: Colors.grey[400]),
                 ),
-                Row(
-                  children: [
-                    IconButton(
-                      onPressed: () => _editVisitor(visitor),
-                      icon: const Icon(Icons.edit, color: Colors.blue, size: 20),
-                      tooltip: 'Edit Profile',
-                    ),
-                    IconButton(
-                      onPressed: () => _deleteVisitor(visitor),
-                      icon: const Icon(Icons.delete, color: Colors.red, size: 20),
-                      tooltip: 'Delete Profile',
-                    ),
-                  ],
+                // Name and Actions
+                Expanded(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          visitor['name'] ?? 'Unknown',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                      Row(
+                        children: [
+                          IconButton(
+                            onPressed: () => _editVisitor(visitor),
+                            icon: const Icon(Icons.edit, color: Colors.blue, size: 20),
+                            tooltip: 'Edit Profile',
+                          ),
+                          IconButton(
+                            onPressed: () => _deleteVisitor(visitor),
+                            icon: const Icon(Icons.delete, color: Colors.red, size: 20),
+                            tooltip: 'Delete Profile',
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -235,6 +270,8 @@ class _VisitorProfileScreenState extends State<VisitorProfileScreen> {
             Expanded(
               child: ListView(
                 children: [
+                  // Profile Image Section
+                  _buildImageSection(),
                   _buildTextField(_nameController, 'Name', 'Enter visitor name'),
                   _buildTextField(_emailController, 'Email', 'Enter email address'),
                   _buildTextField(_phoneController, 'Phone', 'Enter phone number'),
@@ -302,6 +339,7 @@ class _VisitorProfileScreenState extends State<VisitorProfileScreen> {
     setState(() {
       _editingVisitorId = visitor['_id'];
       _showForm = true;
+      _selectedImage = null; // Clear any previously selected image
     });
     
     _nameController.text = visitor['name'] ?? '';
@@ -393,6 +431,14 @@ class _VisitorProfileScreenState extends State<VisitorProfileScreen> {
         'purpose': _purposeController.text.trim(),
         'relationship': _relationshipController.text.trim(),
       };
+      
+      // Add image if selected
+      if (_selectedImage != null) {
+        final base64Image = ApiService.convertImageToBase64(_selectedImage);
+        if (base64Image != null) {
+          visitorData['profileImage'] = base64Image;
+        }
+      }
 
       print('Submitting visitor data: $visitorData');
 
@@ -466,6 +512,119 @@ class _VisitorProfileScreenState extends State<VisitorProfileScreen> {
     );
   }
 
+  Widget _buildImageSection() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 20),
+      child: Card(
+        color: AppColors.cardDark,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              // Image Preview
+              Container(
+                width: 120,
+                height: 120,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(60),
+                  color: Colors.grey[700],
+                  border: Border.all(color: AppColors.primary, width: 2),
+                ),
+                child: _selectedImage != null
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(58),
+                        child: Image.file(
+                          _selectedImage!,
+                          fit: BoxFit.cover,
+                        ),
+                      )
+                    : _editingVisitorId != null && _getEditingVisitorImage() != null
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(58),
+                            child: Image.network(
+                              _getEditingVisitorImage()!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Icon(Icons.person, size: 60, color: Colors.grey[400]);
+                              },
+                            ),
+                          )
+                        : Icon(Icons.person, size: 60, color: Colors.grey[400]),
+              ),
+              const SizedBox(height: 16),
+              // Image Buttons
+              Wrap(
+                alignment: WrapAlignment.center,
+                spacing: 8,
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: () => _pickImage(ImageSource.camera),
+                    icon: const Icon(Icons.camera_alt, size: 16),
+                    label: const Text('Camera'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    ),
+                  ),
+                  ElevatedButton.icon(
+                    onPressed: () => _pickImage(ImageSource.gallery),
+                    icon: const Icon(Icons.photo_library, size: 16),
+                    label: const Text('Gallery'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.grey[600],
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    ),
+                  ),
+                  if (_selectedImage != null)
+                    IconButton(
+                      onPressed: () => setState(() => _selectedImage = null),
+                      icon: const Icon(Icons.delete, color: Colors.red),
+                      tooltip: 'Remove Image',
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+  
+  Future<void> _pickImage(ImageSource source) async {
+    try {
+      final XFile? image = await _picker.pickImage(
+        source: source,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 85,
+      );
+      
+      if (image != null) {
+        setState(() {
+          _selectedImage = File(image.path);
+        });
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error picking image: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+  
+  String? _getEditingVisitorImage() {
+    if (_editingVisitorId == null) return null;
+    final visitor = _visitors.firstWhere(
+      (v) => v['_id'] == _editingVisitorId,
+      orElse: () => null,
+    );
+    return visitor?['imageUrl'];
+  }
+  
   void _clearForm() {
     _nameController.clear();
     _emailController.clear();
@@ -473,6 +632,7 @@ class _VisitorProfileScreenState extends State<VisitorProfileScreen> {
     _addressController.clear();
     _purposeController.clear();
     _relationshipController.clear();
+    _selectedImage = null;
   }
 
   void _showSuccessDialog({required bool isEdit}) {
