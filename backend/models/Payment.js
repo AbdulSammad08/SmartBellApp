@@ -15,6 +15,10 @@ const paymentSchema = new mongoose.Schema({
     type: String, // File path/URL
     required: true
   },
+  receiptFileName: {
+    type: String, // Azure blob file name
+    required: false
+  },
   planSelected: {
     type: String,
     required: true

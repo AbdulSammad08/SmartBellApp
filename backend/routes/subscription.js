@@ -1,36 +1,15 @@
 const express = require('express');
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
 const SubscriptionPlan = require('../models/SubscriptionPlan');
 const Payment = require('../models/Payment');
 const User = require('../models/User');
 const UserSubscription = require('../models/UserSubscription');
 const authenticateToken = require('../middleware/auth');
 const { requireSubscription, getSubscriptionDetails } = require('../middleware/subscriptionAuth');
+const paymentBlobService = require('../services/paymentBlobService');
+const { v4: uuidv4 } = require('uuid');
 const router = express.Router();
 
-// Configure multer for file uploads
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadDir = 'uploads/receipts';
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, 'receipt-' + uniqueSuffix + path.extname(file.originalname));
-  }
-});
 
-const upload = multer({
-  storage: storage,
-  limits: {
-    fileSize: 5 * 1024 * 1024 // 5MB limit
-  }
-});
 
 // GET /api/subscription/plans - Get all active subscription plans
 router.get('/plans', async (req, res) => {
@@ -51,14 +30,16 @@ router.get('/plans', async (req, res) => {
 });
 
 // Submit payment proof
-router.post('/submit-payment', authenticateToken, upload.single('receiptFile'), async (req, res) => {
+router.post('/submit-payment', authenticateToken, async (req, res) => {
   try {
-    const { userName, contactNumber, planSelected, billingCycle, finalAmount, deviceId } = req.body;
+    console.log('Payment submission request body keys:', Object.keys(req.body));
+    const { userName, contactNumber, planSelected, billingCycle, finalAmount, deviceId, receiptImage, receiptFile } = req.body;
     
-    if (!req.file) {
+    const imageData = receiptImage || receiptFile;
+    if (!imageData) {
       return res.status(400).json({
         success: false,
-        message: 'Receipt file is required'
+        message: 'Receipt image is required'
       });
     }
   
@@ -97,14 +78,27 @@ router.post('/submit-payment', authenticateToken, upload.single('receiptFile'), 
         message: 'You already have a pending payment. Please wait for approval.'
       });
     }
-  
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
-    const receiptUrl = `${baseUrl}/${req.file.path.replace(/\\/g, '/')}`;
+
+    let receiptUrl = null;
+    let receiptFileName = null;
+    
+    // Upload receipt image to Azure Blob Storage
+    try {
+      const imageBuffer = Buffer.from(imageData.split(',')[1], 'base64');
+      receiptFileName = `receipt-${uuidv4()}.jpg`;
+      receiptUrl = await paymentBlobService.uploadPaymentProof(imageBuffer, receiptFileName);
+    } catch (imageError) {
+      return res.status(400).json({
+        success: false,
+        message: 'Failed to upload receipt image: ' + imageError.message
+      });
+    }
     
     const payment = new Payment({
       userName,
       contactNumber,
       receiptFile: receiptUrl,
+      receiptFileName,
       planSelected,
       billingCycle,
       finalAmount: parseFloat(finalAmount),
@@ -202,16 +196,27 @@ router.get('/status', authenticateToken, getSubscriptionDetails, async (req, res
       status: 'pending'
     });
 
-    res.json({
-      success: true,
-      subscription: req.user.subscription,
-      pendingPayment: actualPendingPayment ? {
+    let pendingPaymentData = null;
+    if (actualPendingPayment) {
+      pendingPaymentData = {
         id: actualPendingPayment._id,
         planSelected: actualPendingPayment.planSelected,
         billingCycle: actualPendingPayment.billingCycle,
         finalAmount: actualPendingPayment.finalAmount,
-        submittedAt: actualPendingPayment.createdAt
-      } : null
+        submittedAt: actualPendingPayment.createdAt,
+        receiptFile: actualPendingPayment.receiptFile
+      };
+      
+      // Convert Azure URL to proxy URL if receiptFileName exists
+      if (actualPendingPayment.receiptFileName) {
+        pendingPaymentData.receiptFile = `${process.env.SERVER_BASE_URL || 'http://192.168.1.141:8080'}/api/payment-images/${actualPendingPayment.receiptFileName}`;
+      }
+    }
+
+    res.json({
+      success: true,
+      subscription: req.user.subscription,
+      pendingPayment: pendingPaymentData
     });
   } catch (error) {
     console.error('Get subscription status error:', error);
@@ -321,6 +326,11 @@ router.post('/reject-payment/:paymentId', authenticateToken, async (req, res) =>
     payment.approvedBy = rejectedBy || 'Admin';
     payment.approvedAt = new Date();
     await payment.save();
+
+    // Delete receipt image from blob storage if exists
+    if (payment.receiptFileName) {
+      await paymentBlobService.deletePaymentProof(payment.receiptFileName);
+    }
 
     // Update user subscription status
     const user = await User.findById(payment.userId);
