@@ -115,45 +115,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
     BuildContext context,
     Map<String, dynamic> feature,
   ) {
-    // Check if subscription is required for this feature
-    if (!_hasActiveSubscription && feature['title'] != 'Subscription Plans' && feature['title'] != 'Configure Wi-Fi') {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => const SubscriptionPlansScreen(),
-        ),
-      );
-      return;
-    }
-
+    // Since we only show authorized features, direct navigation without guards
     if (feature['requiresStream']) {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => SubscriptionGuard(
-            requiresSubscription: true,
-            child: const NotificationCenterScreen(),
-          ),
+          builder: (_) => const NotificationCenterScreen(),
         ),
       );
     } else {
       final routes = {
-        'Facial Recognition': SubscriptionGuard(
-          requiredFeature: 'facialRecognition',
-          featureName: 'Facial Recognition',
-          child: const FaceRecognitionScreen(),
-        ),
-        'Motion Detection': SubscriptionGuard(
-          requiredFeature: 'motionDetection',
-          featureName: 'Motion Detection',
-          child: const MotionDetectionScreen(),
-        ),
+        'Facial Recognition': const FaceRecognitionScreen(),
+        'Motion Detection': const MotionDetectionScreen(),
         'Subscription Plans': const SubscriptionPlansScreen(),
-        'Visitor Profile': SubscriptionGuard(
-          requiredFeature: 'visitorProfile',
-          featureName: 'Visitor Profile',
-          child: const VisitorProfileScreen(),
-        ),
+        'Visitor Profile': const VisitorProfileScreen(),
         'Request': const RequestTransferScreen(),
         'Configure Wi-Fi': const ConfigureWiFiScreen(),
         'ESP32 Devices': const ESP32DevicesScreen(),
@@ -261,21 +236,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
     List<Map<String, dynamic>> visibleFeatures = [];
     
     if (!_hasActiveSubscription) {
-      // Show only Subscription Plans and Configure Wi-Fi when no subscription
+      // Show only Subscription Plans when no subscription
       visibleFeatures = features.where((feature) => 
-        feature['title'] == 'Subscription Plans' || 
-        feature['title'] == 'Configure Wi-Fi'
+        feature['title'] == 'Subscription Plans'
       ).toList();
     } else {
-      // Show features based on subscription plan
+      // Show features based on subscription plan - completely hide unauthorized features
       visibleFeatures = features.where((feature) {
         switch (feature['title']) {
           case 'Subscription Plans':
           case 'Configure Wi-Fi':
-          case 'Notification Center':
           case 'Request':
           case 'ESP32 Devices':
-            return true;  // Always show these
+            return true;  // Always show these with any subscription
+          case 'Notification Center':
+            return _features['liveStream'] ?? false;
           case 'Facial Recognition':
             return _features['facialRecognition'] ?? false;
           case 'Motion Detection':
@@ -283,7 +258,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           case 'Visitor Profile':
             return _features['visitorProfile'] ?? false;
           default:
-            return true;
+            return false;
         }
       }).toList();
     }
@@ -327,37 +302,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
   
   Widget _buildFeatureBoxFromFeature(Map<String, dynamic> feature) {
-    bool isAccessible = true;
-    bool showLock = false;
-    
-    // Always allow Subscription Plans and Configure Wi-Fi
-    if (feature['title'] == 'Subscription Plans' || feature['title'] == 'Configure Wi-Fi') {
-      isAccessible = true;
-      showLock = false;
-    }
-    // Check feature accessibility based on subscription plan
-    else if (_hasActiveSubscription) {
-      switch (feature['title']) {
-        case 'Facial Recognition':
-          isAccessible = _features['facialRecognition'] ?? false;
-          showLock = !isAccessible;
-          break;
-        case 'Motion Detection':
-          isAccessible = _features['motionDetection'] ?? false;
-          showLock = !isAccessible;
-          break;
-        case 'Visitor Profile':
-          isAccessible = _features['visitorProfile'] ?? false;
-          showLock = !isAccessible;
-          break;
-        default:
-          isAccessible = true;
-          showLock = false;
-      }
-    }
-    
+    // Since we only show authorized features, all visible features are accessible
     return Material(
-      color: isAccessible ? Colors.grey[900] : Colors.grey[800],
+      color: Colors.grey[900],
       borderRadius: BorderRadius.circular(16),
       elevation: 6,
       child: InkWell(
@@ -368,38 +315,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
         child: Container(
           padding: const EdgeInsets.all(16),
           height: 150,
-          child: Stack(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    feature['icon'], 
-                    color: isAccessible ? feature['color'] : Colors.grey[600], 
-                    size: 36
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    feature['title'],
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: isAccessible ? Colors.white : Colors.grey[500],
-                    ),
-                  ),
-                ],
+              Icon(
+                feature['icon'], 
+                color: feature['color'], 
+                size: 36
               ),
-              if (showLock)
-                Positioned(
-                  top: 8,
-                  right: 8,
-                  child: Icon(
-                    Icons.lock,
-                    color: Colors.orange,
-                    size: 20,
-                  ),
+              const SizedBox(height: 10),
+              Text(
+                feature['title'],
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
                 ),
+              ),
             ],
           ),
         ),

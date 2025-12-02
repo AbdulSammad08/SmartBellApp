@@ -239,12 +239,46 @@ class _SubscriptionCenterScreenState extends State<SubscriptionCenterScreen> {
   }
 
   Widget _buildFeatureAccess() {
-    final features = _subscriptionData?['features'] ?? {
-      'liveStream': false,
-      'motionDetection': false,
-      'facialRecognition': false,
-      'visitorProfile': false,
-    };
+    final status = _subscriptionData?['status'] ?? 'none';
+    final plan = _subscriptionData?['plan']?.toString().toLowerCase() ?? '';
+    
+    Map<String, bool> actualFeatures = {};
+    
+    if (status == 'active') {
+      if (plan.contains('basic')) {
+        actualFeatures = {
+          'Notification Center': true,
+          'Request': true,
+          'ESP32 Devices': true,
+          'Configure Wi-Fi': true,
+          'Subscription Plans': true,
+        };
+      } else if (plan.contains('premium')) {
+        actualFeatures = {
+          'Notification Center': true,
+          'Motion Detection': true,
+          'Request': true,
+          'ESP32 Devices': true,
+          'Configure Wi-Fi': true,
+          'Subscription Plans': true,
+        };
+      } else if (plan.contains('business')) {
+        actualFeatures = {
+          'Notification Center': true,
+          'Motion Detection': true,
+          'Facial Recognition': true,
+          'Visitor Profile': true,
+          'Request': true,
+          'ESP32 Devices': true,
+          'Configure Wi-Fi': true,
+          'Subscription Plans': true,
+        };
+      }
+    } else {
+      actualFeatures = {
+        'Subscription Plans': true,
+      };
+    }
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -256,7 +290,7 @@ class _SubscriptionCenterScreenState extends State<SubscriptionCenterScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Feature Access',
+            'Available Features',
             style: TextStyle(
               color: Colors.white,
               fontSize: 18,
@@ -264,10 +298,9 @@ class _SubscriptionCenterScreenState extends State<SubscriptionCenterScreen> {
             ),
           ),
           const SizedBox(height: 15),
-          _buildFeatureItem('Live Stream', features['liveStream'] ?? false),
-          _buildFeatureItem('Motion Detection', features['motionDetection'] ?? false),
-          _buildFeatureItem('Facial Recognition', features['facialRecognition'] ?? false),
-          _buildFeatureItem('Visitor Profile', features['visitorProfile'] ?? false),
+          ...actualFeatures.entries.map((entry) => 
+            _buildFeatureItem(entry.key, entry.value)
+          ).toList(),
         ],
       ),
     );
