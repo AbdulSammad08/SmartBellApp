@@ -240,41 +240,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
               ),
               const SizedBox(height: 30),
-              Column(
-                children: [
-                  Row(
-                    children: [
-                      Expanded(child: _buildFeatureBox(0)),
-                      const SizedBox(width: 16),
-                      Expanded(child: _buildFeatureBox(1)),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(child: _buildFeatureBox(2)),
-                      const SizedBox(width: 16),
-                      Expanded(child: _buildFeatureBox(3)),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(child: _buildFeatureBox(4)),
-                      const SizedBox(width: 16),
-                      Expanded(child: _buildFeatureBox(5)),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(child: _buildFeatureBox(6)),
-                      const SizedBox(width: 16),
-                      Expanded(child: _buildFeatureBox(7)),
-                    ],
-                  ),
-                ],
-              ),
+              _buildFeatureGrid(),
               const SizedBox(height: 30),
               const Divider(color: Colors.grey),
               const SizedBox(height: 10),
@@ -291,16 +257,86 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildFeatureBox(int index) {
-    final feature = features[index];
+  Widget _buildFeatureGrid() {
+    List<Map<String, dynamic>> visibleFeatures = [];
+    
+    if (!_hasActiveSubscription) {
+      // Show only Subscription Plans and Configure Wi-Fi when no subscription
+      visibleFeatures = features.where((feature) => 
+        feature['title'] == 'Subscription Plans' || 
+        feature['title'] == 'Configure Wi-Fi'
+      ).toList();
+    } else {
+      // Show features based on subscription plan
+      visibleFeatures = features.where((feature) {
+        switch (feature['title']) {
+          case 'Subscription Plans':
+          case 'Configure Wi-Fi':
+          case 'Notification Center':
+          case 'Request':
+          case 'ESP32 Devices':
+            return true;  // Always show these
+          case 'Facial Recognition':
+            return _features['facialRecognition'] ?? false;
+          case 'Motion Detection':
+            return _features['motionDetection'] ?? false;
+          case 'Visitor Profile':
+            return _features['visitorProfile'] ?? false;
+          default:
+            return true;
+        }
+      }).toList();
+    }
+    
+    return Column(
+      children: _buildFeatureRows(visibleFeatures),
+    );
+  }
+  
+  List<Widget> _buildFeatureRows(List<Map<String, dynamic>> visibleFeatures) {
+    List<Widget> rows = [];
+    
+    for (int i = 0; i < visibleFeatures.length; i += 2) {
+      List<Widget> rowChildren = [];
+      
+      // First feature in row
+      rowChildren.add(Expanded(
+        child: _buildFeatureBoxFromFeature(visibleFeatures[i])
+      ));
+      
+      // Second feature in row (if exists)
+      if (i + 1 < visibleFeatures.length) {
+        rowChildren.add(const SizedBox(width: 16));
+        rowChildren.add(Expanded(
+          child: _buildFeatureBoxFromFeature(visibleFeatures[i + 1])
+        ));
+      } else {
+        // Empty space if odd number of features
+        rowChildren.add(const SizedBox(width: 16));
+        rowChildren.add(const Expanded(child: SizedBox()));
+      }
+      
+      rows.add(Row(children: rowChildren));
+      
+      if (i + 2 < visibleFeatures.length) {
+        rows.add(const SizedBox(height: 16));
+      }
+    }
+    
+    return rows;
+  }
+  
+  Widget _buildFeatureBoxFromFeature(Map<String, dynamic> feature) {
     bool isAccessible = true;
     bool showLock = false;
     
-    // Check feature accessibility
-    if (!_hasActiveSubscription && feature['title'] != 'Subscription Plans' && feature['title'] != 'Configure Wi-Fi') {
-      isAccessible = false;
-      showLock = true;
-    } else if (_hasActiveSubscription) {
+    // Always allow Subscription Plans and Configure Wi-Fi
+    if (feature['title'] == 'Subscription Plans' || feature['title'] == 'Configure Wi-Fi') {
+      isAccessible = true;
+      showLock = false;
+    }
+    // Check feature accessibility based on subscription plan
+    else if (_hasActiveSubscription) {
       switch (feature['title']) {
         case 'Facial Recognition':
           isAccessible = _features['facialRecognition'] ?? false;
@@ -313,6 +349,99 @@ class _DashboardScreenState extends State<DashboardScreen> {
         case 'Visitor Profile':
           isAccessible = _features['visitorProfile'] ?? false;
           showLock = !isAccessible;
+          break;
+        default:
+          isAccessible = true;
+          showLock = false;
+      }
+    }
+    
+    return Material(
+      color: isAccessible ? Colors.grey[900] : Colors.grey[800],
+      borderRadius: BorderRadius.circular(16),
+      elevation: 6,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        splashColor: feature['color'].withOpacity(0.3),
+        highlightColor: feature['color'].withOpacity(0.2),
+        onTap: () => _handleFeatureNavigation(context, feature),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          height: 150,
+          child: Stack(
+            children: [
+              Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    feature['icon'], 
+                    color: isAccessible ? feature['color'] : Colors.grey[600], 
+                    size: 36
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    feature['title'],
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: isAccessible ? Colors.white : Colors.grey[500],
+                    ),
+                  ),
+                ],
+              ),
+              if (showLock)
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Icon(
+                    Icons.lock,
+                    color: Colors.orange,
+                    size: 20,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFeatureBox(int index) {
+    final feature = features[index];
+    bool isAccessible = true;
+    bool showLock = false;
+    
+    // Always allow Subscription Plans and Configure Wi-Fi
+    if (feature['title'] == 'Subscription Plans' || feature['title'] == 'Configure Wi-Fi') {
+      isAccessible = true;
+      showLock = false;
+    }
+    // If no active subscription, only show subscription and wifi
+    else if (!_hasActiveSubscription) {
+      isAccessible = false;
+      showLock = true;
+    }
+    // Check feature accessibility based on subscription plan
+    else {
+      switch (feature['title']) {
+        case 'Facial Recognition':
+          isAccessible = _features['facialRecognition'] ?? false;
+          showLock = !isAccessible;
+          break;
+        case 'Motion Detection':
+          isAccessible = _features['motionDetection'] ?? false;
+          showLock = !isAccessible;
+          break;
+        case 'Visitor Profile':
+          isAccessible = _features['visitorProfile'] ?? false;
+          showLock = !isAccessible;
+          break;
+        case 'Notification Center':
+        case 'Request':
+        case 'ESP32 Devices':
+          isAccessible = true;  // Always available with any active subscription
+          showLock = false;
           break;
       }
     }
