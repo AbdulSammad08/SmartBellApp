@@ -5,6 +5,8 @@ import 'forgot_password_screen.dart';
 import '../../widgets/background_wrapper.dart';
 import '../../widgets/connection_status.dart';
 import '../../services/api_service.dart';
+import '../../utils/connection_tester.dart';
+import '../debug_connection_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -24,6 +26,82 @@ class _LoginScreenState extends State<LoginScreen> {
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  void _showConnectionError(ConnectionTestResult result) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.cardDark,
+        title: const Row(
+          children: [
+            Icon(Icons.error_outline, color: Colors.red),
+            SizedBox(width: 8),
+            Text(
+              'Connection Failed',
+              style: TextStyle(color: Colors.white),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              result.message,
+              style: const TextStyle(color: Colors.white70),
+            ),
+            if (result.suggestions.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              const Text(
+                'Try these solutions:',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              ...result.suggestions.map((suggestion) => Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('• ', style: TextStyle(color: Colors.white70)),
+                    Expanded(
+                      child: Text(
+                        suggestion,
+                        style: const TextStyle(color: Colors.white70),
+                      ),
+                    ),
+                  ],
+                ),
+              )),
+            ]
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK', style: TextStyle(color: AppColors.primary)),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const DebugConnectionScreen(),
+                ),
+              );
+            },
+            child: const Text(
+              'Debug',
+              style: TextStyle(color: AppColors.primary),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -99,6 +177,15 @@ class _LoginScreenState extends State<LoginScreen> {
                               onPressed: _isLoading ? null : () async {
                                 if (_formKey.currentState!.validate()) {
                                   setState(() => _isLoading = true);
+                                  
+                                  // First test connection
+                                  final connectionTest = await ConnectionTester.testConnection();
+                                  
+                                  if (!connectionTest.success) {
+                                    setState(() => _isLoading = false);
+                                    _showConnectionError(connectionTest);
+                                    return;
+                                  }
                                   
                                   final response = await ApiService.login(
                                     email: _emailController.text.trim(),
@@ -187,6 +274,25 @@ class _LoginScreenState extends State<LoginScreen> {
                             child: const Text(
                               'Create New Account',
                               style: TextStyle(color: AppColors.primary),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          TextButton.icon(
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const DebugConnectionScreen(),
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.network_check, size: 16),
+                            label: const Text(
+                              'Debug Connection',
+                              style: TextStyle(fontSize: 12),
+                            ),
+                            style: TextButton.styleFrom(
+                              foregroundColor: Colors.grey[400],
                             ),
                           ),
                         ],
