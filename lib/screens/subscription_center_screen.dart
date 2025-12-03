@@ -300,7 +300,7 @@ class _SubscriptionCenterScreenState extends State<SubscriptionCenterScreen> {
           const SizedBox(height: 15),
           ...actualFeatures.entries.map((entry) => 
             _buildFeatureItem(entry.key, entry.value)
-          ).toList(),
+          ),
         ],
       ),
     );

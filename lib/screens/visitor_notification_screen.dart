@@ -37,9 +37,8 @@ class _VisitorNotificationScreenState extends State<VisitorNotificationScreen>
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => const LiveStreamScreen(
-          videoUrl: 'http://192.168.100.137/stream',
-          audioUrl: 'http://192.168.100.138',
+        builder: (context) => LiveStreamScreen(
+          streamUrl: widget.streamUrl ?? 'http://doorbell-video.local/stream',
         ),
       ),
     );

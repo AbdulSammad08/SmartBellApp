@@ -45,6 +45,7 @@ dependencies:
   webview_flutter: ^4.7.0
   image_picker: ^1.0.7
   web_socket_channel: ^2.4.0
+  flutter_sound: ^9.2.13
 
 dev_dependencies:
   flutter_test:

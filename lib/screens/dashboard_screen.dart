@@ -12,7 +12,6 @@ import '../screens/debug_connection_screen.dart';
 import '../services/subscription_service.dart';
 import '../services/api_service.dart';
 import '../widgets/background_wrapper.dart';
-import '../widgets/subscription_guard.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -65,7 +64,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
       'icon': Icons.notifications,
       'color': AppColors.primary,
       'requiresStream': true,
-      'streamUrl': 'http://192.168.100.137/stream',
     },
     {
       'title': 'Facial Recognition',

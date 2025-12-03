@@ -167,10 +167,7 @@ class _SmartDoorBellAppState extends State<SmartDoorBellApp> {
         '/face-recognition': (context) => const FaceRecognitionScreen(),
         '/face-enrollment': (context) => const FaceEnrollmentScreen(),
         '/esp32-devices': (context) => const ESP32DevicesScreen(),
-        '/live-stream': (context) => const LiveStreamScreen(
-          videoUrl: 'http://192.168.100.137/stream',
-          audioUrl: 'http://192.168.100.138',
-        ),
+        '/live-stream': (context) => const LiveStreamScreen(),
         '/visitor-notification':
             (context) => VisitorNotificationScreen(
               streamUrl: ModalRoute.of(context)!.settings.arguments as String,

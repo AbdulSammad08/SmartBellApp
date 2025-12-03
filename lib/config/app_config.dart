@@ -9,6 +9,13 @@ class AppConfig {
     'http://localhost:8080', // Local fallback
   ];
 
+  // Azure Cosmos DB for MongoDB Configuration
+  static const String mongoConnectionString = 'mongodb://your-account:your-key@your-account.mongo.cosmos.azure.com:10255/?ssl=true&replicaSet=globaldb&retrywrites=false&maxIdleTimeMS=120000&appName=@your-account@';
+  static const String databaseName = 'smartdoorbell';
+  static const String motionCollectionName = 'motion_detections';
+  
+  // Get MongoDB connection string from Cosmos DB -> Connection String in Azure Portal
+
   static const Duration connectionTimeout = Duration(seconds: 10);
   static const int maxRetries = 3;
   static const bool enableDebugLogs = true;
