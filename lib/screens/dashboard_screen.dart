@@ -101,12 +101,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       'color': Colors.teal,
       'requiresStream': false,
     },
-    {
-      'title': 'ESP32 Devices',
-      'icon': Icons.devices,
-      'color': Colors.indigo,
-      'requiresStream': false,
-    },
+
   ];
 
   void _handleFeatureNavigation(
@@ -129,7 +124,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         'Visitor Profile': const VisitorProfileScreen(),
         'Request': const RequestTransferScreen(),
         'Configure Wi-Fi': const ConfigureWiFiScreen(),
-        'ESP32 Devices': const ESP32DevicesScreen(),
+
       };
 
       if (routes.containsKey(feature['title'])) {
@@ -171,18 +166,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ),
           actions: [
-            IconButton(
-              icon: const Icon(Icons.network_check),
-              tooltip: 'Debug Connection',
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const DebugConnectionScreen(),
-                  ),
-                );
-              },
-            ),
             IconButton(
               icon: const Icon(Icons.subscriptions),
               tooltip: 'Subscription Center',
@@ -245,7 +228,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           case 'Subscription Plans':
           case 'Configure Wi-Fi':
           case 'Request':
-          case 'ESP32 Devices':
             return true;  // Always show these with any subscription
           case 'Notification Center':
             return _features['liveStream'] ?? false;
@@ -370,7 +352,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           break;
         case 'Notification Center':
         case 'Request':
-        case 'ESP32 Devices':
           isAccessible = true;  // Always available with any active subscription
           showLock = false;
           break;

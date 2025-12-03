@@ -44,6 +44,8 @@ class _MotionDetectionScreenState extends State<MotionDetectionScreen> {
     
     try {
       final motions = await _service.getRecentMotions();
+      print('Loaded ${motions.length} motion detections');
+      
       if (mounted) {
         setState(() {
           _motions = _filterMotions(motions);
@@ -51,6 +53,7 @@ class _MotionDetectionScreenState extends State<MotionDetectionScreen> {
         });
       }
     } catch (e) {
+      print('Load motions error: $e');
       if (mounted) {
         setState(() => _loading = false);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -60,6 +63,35 @@ class _MotionDetectionScreenState extends State<MotionDetectionScreen> {
           ),
         );
       }
+    }
+  }
+
+  Future<void> _addTestData() async {
+    try {
+      final success = await _service.addTestData();
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Test data added successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        _loadMotions();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to add test data'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error adding test data: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
@@ -130,6 +162,11 @@ class _MotionDetectionScreenState extends State<MotionDetectionScreen> {
                   ),
                 ),
               ).toList(),
+            ),
+            IconButton(
+              icon: const Icon(Icons.add_circle, color: AppColors.textOnDark),
+              onPressed: _addTestData,
+              tooltip: 'Add Test Data',
             ),
             IconButton(
               icon: const Icon(Icons.refresh, color: AppColors.textOnDark),

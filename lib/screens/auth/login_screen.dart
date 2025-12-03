@@ -179,18 +179,23 @@ class _LoginScreenState extends State<LoginScreen> {
                                   setState(() => _isLoading = true);
                                   
                                   // First test connection
+                                  print('🔐 Starting login process...');
                                   final connectionTest = await ConnectionTester.testConnection();
+                                  print('🔗 Connection test result: ${connectionTest.success}');
                                   
                                   if (!connectionTest.success) {
+                                    print('❌ Connection test failed: ${connectionTest.message}');
                                     setState(() => _isLoading = false);
                                     _showConnectionError(connectionTest);
                                     return;
                                   }
                                   
+                                  print('📧 Attempting login with email: ${_emailController.text.trim()}');
                                   final response = await ApiService.login(
                                     email: _emailController.text.trim(),
                                     password: _passwordController.text,
                                   );
+                                  print('📨 Login response: success=${response.success}, message=${response.message}');
                                   
                                   setState(() => _isLoading = false);
                                   

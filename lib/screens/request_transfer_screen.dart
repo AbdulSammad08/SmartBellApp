@@ -345,8 +345,10 @@ class _RequestTransferScreenState extends State<RequestTransferScreen> {
   }
 
   Widget _buildRequestCard(dynamic request) {
-    final status = request['status'] ?? 'Pending';
-    final isPending = status.toLowerCase() == 'pending';
+    // Check __v field to determine status
+    final versionField = request['__v'] ?? 0;
+    final status = versionField == 0 ? 'Pending' : 'Approved';
+    final isPending = versionField == 0;
     
     return Card(
       color: AppColors.cardDark,
@@ -369,6 +371,21 @@ class _RequestTransferScreenState extends State<RequestTransferScreen> {
                     ),
                   ),
                 ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: _getStatusColor(status),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    status,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
                 if (isPending) ...[
                   IconButton(
                     onPressed: () => _editRequest(request),
@@ -387,21 +404,6 @@ class _RequestTransferScreenState extends State<RequestTransferScreen> {
             Text(
               'Submitted: ${request['createdAt'] ?? 'Unknown'}',
               style: TextStyle(color: Colors.grey[400], fontSize: 12),
-            ),
-            const SizedBox(height: 6),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: _getStatusColor(status),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                status,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
             ),
           ],
         ),

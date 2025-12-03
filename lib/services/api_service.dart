@@ -578,33 +578,36 @@ class ApiService {
     }
   }
 
-  static Future<Map<String, dynamic>> getMotionDetections() async {
+  static Future<List<dynamic>> getMotionDetections({int limit = 50}) async {
     try {
       final baseUrl = await _getWorkingBaseUrl();
       final token = await _getStoredToken();
       
+      if (token == null) return [];
+      
       final response = await http.get(
-        Uri.parse('$baseUrl/api/motion/detections'),
+        Uri.parse('$baseUrl/api/motion/detections?limit=$limit'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
       ).timeout(AppConfig.connectionTimeout);
       
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body);
-      } else {
-        return {
-          'success': false,
-          'message': 'Failed to fetch motion detections',
-        };
+      if (response.statusCode == 401) {
+        await _clearStoredToken();
+        return [];
       }
+      
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['success']) {
+          return data['data'] ?? [];
+        }
+      }
+      return [];
     } catch (e) {
       await ServerDiscoveryService.clearCache();
-      return {
-        'success': false,
-        'message': 'Connection failed: $e',
-      };
+      return [];
     }
   }
 
